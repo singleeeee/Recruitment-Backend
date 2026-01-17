@@ -1,0 +1,148 @@
+// Prisma Schema for Recruitment System
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         String    @default("candidate") // candidate, admin, system_admin
+  studentId    String?   @map("student_id")
+  name         String?
+  college      String?
+  major        String?
+  grade        String?
+  phone        String?
+  avatar       String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  applications       Application[]      @relation("ApplicantApplications")
+  createdRecruitments RecruitmentBatch[] @relation("AdminRecruitments")
+  interviewFeedbacks InterviewFeedback[]
+
+  @@map("users")
+}
+
+// 招新批次表
+model RecruitmentBatch {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  startTime   DateTime @map("start_time")
+  endTime     DateTime @map("end_time")
+  status      String   @default("draft") // draft, published, ongoing, finished, archived
+  maxApplicants Int?   @map("max_applicants")
+  requiredFields String[] @map("required_fields")
+  customQuestions Json?  @map("custom_questions")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  adminId     String   @map("admin_id")
+  admin       User     @relation("AdminRecruitments", fields: [adminId], references: [id])
+
+  applications Application[]
+
+  @@map("recruitment_batches")
+}
+
+// 申请表
+model Application {
+  id           String   @id @default(uuid())
+  status       String   @default("draft") // draft, submitted, screening, passed, rejected, interview_scheduled, interview_completed, offer_sent, accepted, declined, archived
+  resumeText   String?  @map("resume_text")
+  aiScore      Decimal? @map("ai_score")
+  aiAnalysis   Json?    @map("ai_analysis")
+  education    Json?
+  skills       Json?
+  experiences  Json?
+  attachments  Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  recruitmentId String               @map("recruitment_id")
+  recruitment   RecruitmentBatch     @relation(fields: [recruitmentId], references: [id])
+
+  applicantId String @map("applicant_id")
+  applicant   User   @relation("ApplicantApplications", fields: [applicantId], references: [id])
+
+  interviews Interview[]
+
+  @@map("applications")
+}
+
+// 面试安排表
+model Interview {
+  id             String   @id @default(uuid())
+  scheduledTime  DateTime @map("scheduled_time")
+  duration       Int      @default(60)
+  meetingLink    String?  @map("meeting_link")
+  location       String?
+  status         String   @default("scheduled") // scheduled, completed, cancelled
+  questions      Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  applicationId String       @map("application_id")
+  application   Application  @relation(fields: [applicationId], references: [id])
+
+  interviewers InterviewFeedback[]
+
+  @@map("interviews")
+}
+
+// 面试反馈表
+model InterviewFeedback {
+  id           String   @id @default(uuid())
+  interviewerId String  @map("interviewer_id")
+  interviewer  User     @relation(fields: [interviewerId], references: [id])
+
+  interviewId String   @map("interview_id")
+  interview   Interview @relation(fields: [interviewId], references: [id])
+
+  technicalScore  Decimal? @map("technical_score")
+  communicationScore Decimal? @map("communication_score")
+  overallScore    Decimal? @map("overall_score")
+  recommendation  String?  // strongly_recommend, recommend, pending, not_recommend
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("interview_feedbacks")
+}
+
+// 文件表
+model File {
+  id           String   @id @default(uuid())
+  filename     String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  size         BigInt
+  storagePath  String   @map("storage_path")
+  uploadedBy   String   @map("uploaded_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("files")
+}
+
+// 通知表
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   // application_confirmation, interview_invitation, offer_sent, rejection, status_update, etc.
+  title     String
+  content   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
