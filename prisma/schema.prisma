@@ -23,6 +23,8 @@ model User {
   grade        String?
   phone        String?
   avatar       String?
+  experience   String?   @map("experience")  // 相关经验
+  motivation   String?   @map("motivation")  // 申请动机
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 

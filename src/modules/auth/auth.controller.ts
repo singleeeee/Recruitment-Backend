@@ -14,7 +14,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, LoginResponseData } from './dto/auth.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -48,7 +48,7 @@ export class AuthController {
   @ApiResponse({
     status: 201,
     description: '注册成功',
-    type: AuthResponseDto,
+    type: LoginResponseData,
   })
   @ApiResponse({
     status: 409,
@@ -58,7 +58,7 @@ export class AuthController {
     status: 400,
     description: '请求参数错误',
   })
-  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async register(@Body() registerDto: RegisterDto): Promise<LoginResponseData> {
     return this.authService.register(registerDto);
   }
 
@@ -85,13 +85,13 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: '登录成功',
-    type: AuthResponseDto,
+    type: LoginResponseData,
   })
   @ApiResponse({
     status: 401,
     description: '邮箱或密码错误',
   })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(@Body() loginDto: LoginDto): Promise<LoginResponseData> {
     return this.authService.login(loginDto);
   }
 
@@ -117,7 +117,7 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: '令牌刷新成功',
-    type: AuthResponseDto,
+    type: LoginResponseData,
   })
   @ApiResponse({
     status: 401,
@@ -125,7 +125,7 @@ export class AuthController {
   })
   async refreshToken(
     @Body('refreshToken') refreshToken: string,
-  ): Promise<AuthResponseDto> {
+  ): Promise<LoginResponseData> {
     return this.authService.refreshToken(refreshToken);
   }
 

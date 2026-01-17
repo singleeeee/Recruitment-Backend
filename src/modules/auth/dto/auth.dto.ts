@@ -51,7 +51,6 @@ export class RegisterDto {
     description: '学号',
     required: false,
   })
-  @MaxLength(50, { message: '学号不能超过50位' })
   studentId?: string;
 
   @ApiProperty({
@@ -59,7 +58,6 @@ export class RegisterDto {
     description: '学院',
     required: false,
   })
-  @MaxLength(100, { message: '学院名称不能超过100位' })
   college?: string;
 
   @ApiProperty({
@@ -67,7 +65,6 @@ export class RegisterDto {
     description: '专业',
     required: false,
   })
-  @MaxLength(100, { message: '专业名称不能超过100位' })
   major?: string;
 
   @ApiProperty({
@@ -75,7 +72,6 @@ export class RegisterDto {
     description: '年级',
     required: false,
   })
-  @MaxLength(20, { message: '年级不能超过20位' })
   grade?: string;
 
   @ApiProperty({
@@ -83,11 +79,24 @@ export class RegisterDto {
     description: '手机号码',
     required: false,
   })
-  @MaxLength(20, { message: '手机号码不能超过20位' })
   phone?: string;
+
+  @ApiProperty({
+    example: '一年项目经验',
+    description: '相关经验',
+    required: false,
+  })
+  experience?: string;
+
+  @ApiProperty({
+    example: '热爱技术，希望加入团队提升自己',
+    description: '申请动机',
+    required: false,
+  })
+  motivation?: string;
 }
 
-export class AuthResponseDto {
+export class LoginResponseData {
   @ApiProperty({
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
     description: 'JWT访问令牌',
@@ -113,5 +122,7 @@ export class AuthResponseDto {
     major?: string;
     grade?: string;
     avatar?: string;
+    experience?: string;
+    motivation?: string;
   };
 }

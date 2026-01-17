@@ -3,6 +3,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { swaggerConfig } from './config/swagger.config';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -10,11 +12,17 @@ async function bootstrap() {
   // 全局验证管道
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
+      whitelist: false,  // 允许非白名单字段
+      forbidNonWhitelisted: false,  // 不禁止非白名单字段    
       transform: true,
     }),
   );
+
+  // 全局响应拦截器
+  app.useGlobalInterceptors(new ResponseInterceptor());
+
+  // 全局异常过滤器
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // CORS 配置
   app.enableCors({

@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { PasswordUtils } from './utils/password.utils';
-import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, LoginResponseData } from './dto/auth.dto';
 import { User } from '@prisma/client';
 
 @Injectable()
@@ -22,7 +22,7 @@ export class AuthService {
   /**
    * 用户注册
    */
-  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+  async register(dto: RegisterDto): Promise<LoginResponseData> {
     // 检查邮箱是否已存在
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -54,6 +54,8 @@ export class AuthService {
           major: dto.major,
           grade: dto.grade,
           phone: dto.phone,
+          experience: dto.experience,
+          motivation: dto.motivation,
           role: 'candidate', // 默认为候选人角色
         },
       });
@@ -67,7 +69,7 @@ export class AuthService {
   /**
    * 用户登录
    */
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async login(dto: LoginDto): Promise<LoginResponseData> {
     const user = await this.validateUser(dto.email, dto.password);
     if (!user) {
       throw new UnauthorizedException('邮箱或密码错误');
@@ -97,7 +99,7 @@ export class AuthService {
   /**
    * 刷新访问令牌
    */
-  async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
+  async refreshToken(refreshToken: string): Promise<LoginResponseData> {
     try {
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET') || 'your-refresh-secret',
@@ -120,7 +122,7 @@ export class AuthService {
   /**
    * 创建认证响应
    */
-  private createAuthResponse(user: User): AuthResponseDto {
+  private createAuthResponse(user: User): LoginResponseData {
     const payload = {
       sub: user.id,
       email: user.email,
@@ -146,6 +148,8 @@ export class AuthService {
         major: user.major || undefined,
         grade: user.grade || undefined,
         avatar: user.avatar || undefined,
+        experience: user.experience || undefined,
+        motivation: user.motivation || undefined,
       },
     };
   }
