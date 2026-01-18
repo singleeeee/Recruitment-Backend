@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, MinLength, MaxLength, IsObject, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
@@ -18,6 +18,22 @@ export class LoginDto {
   @MinLength(6, { message: '密码至少6位' })
   @MaxLength(50, { message: '密码不能超过50位' })
   password: string;
+}
+
+export class ProfileFieldDataDto {
+  @ApiProperty({
+    example: 'name',
+    description: '字段名称',
+  })
+  @IsNotEmpty({ message: '字段名称不能为空' })
+  fieldName: string;
+
+  @ApiProperty({
+    example: '张三',
+    description: '字段值',
+  })
+  @IsNotEmpty({ message: '字段值不能为空' })
+  fieldValue: string;
 }
 
 export class RegisterDto {
@@ -47,53 +63,30 @@ export class RegisterDto {
   name?: string;
 
   @ApiProperty({
-    example: '2021001001',
-    description: '学号',
+    example: 'test@example.com',
+    description: '邀请人邮箱',
     required: false,
   })
-  studentId?: string;
+  @IsEmail({}, { message: '邀请人邮箱格式无效' })
+  inviterEmail?: string;
 
   @ApiProperty({
-    example: '计算机学院',
-    description: '学院',
-    required: false,
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description: '用户档案字段数据，根据RegistrationField配置动态生成',
+    example: {
+      studentId: '2021001001',
+      phone: '15706623209',
+      college: '计算机学院',
+      major: '计算机科学与技术',
+      grade: '大一',
+      experience: '我的相关经验是...',
+      motivation: '我加入的动机是...'
+    }
   })
-  college?: string;
-
-  @ApiProperty({
-    example: '计算机科学与技术',
-    description: '专业',
-    required: false,
-  })
-  major?: string;
-
-  @ApiProperty({
-    example: '2021级',
-    description: '年级',
-    required: false,
-  })
-  grade?: string;
-
-  @ApiProperty({
-    example: '13800138000',
-    description: '手机号码',
-    required: false,
-  })
-  phone?: string;
-
-  @ApiProperty({
-    example: '一年项目经验',
-    description: '相关经验',
-    required: false,
-  })
-  experience?: string;
-
-  @ApiProperty({
-    example: '热爱技术，希望加入团队提升自己',
-    description: '申请动机',
-    required: false,
-  })
-  motivation?: string;
+  @IsOptional()
+  @IsObject({ message: '档案字段数据格式错误' })
+  profileFields?: { [key: string]: string }; // 或者 Record<string, string>
 }
 
 export class LoginResponseData {
@@ -115,14 +108,21 @@ export class LoginResponseData {
   user: {
     id: string;
     email: string;
-    name: string;
-    role: string;
+    name?: string;
+    role: {
+      id: string;
+      name: string;
+      code: string;
+    };
     studentId?: string;
     college?: string;
     major?: string;
     grade?: string;
+    phone?: string;
     avatar?: string;
-    experience?: string;
-    motivation?: string;
+    status: string;
+    experience?: string; // 动态字段
+    motivation?: string; // 动态字段
+    profileFields?: { [key: string]: string }; // 所有动态字段
   };
 }

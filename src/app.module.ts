@@ -6,6 +6,8 @@ import { UsersModule } from './modules/users/users.module';
 import { RecruitmentModule } from './modules/recruitment/recruitment.module';
 import { ApplicationsModule } from './modules/applications/applications.module';
 import { HealthModule } from './health/health.module';
+import { FilesModule } from './modules/files/files.module';
+import { RegistrationFieldModule } from './modules/registration-field/registration-field.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { HealthModule } from './health/health.module';
     UsersModule,
     RecruitmentModule,
     ApplicationsModule,
+    FilesModule,
+    RegistrationFieldModule,
   ],
   controllers: [],
   providers: [],

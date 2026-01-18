@@ -10,49 +10,178 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 角色表
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // 角色名称
+  code        String   @unique // 角色代码: system_admin, club_admin, candidate
+  description String?  // 角色描述
+  level       Int      @default(0) // 角色级别: 0-候选人, 1-社团管理员, 2-超级管理员
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users      User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+// 权限表
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   // 权限名称
+  code        String   @unique // 权限代码: user_manage, recruitment_manage
+  module      String   // 所属模块: auth, user, recruitment, application, file, system
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+// 角色权限关联表
+model RolePermission {
+  id           String   @id @default(uuid())
+  roleId       String   @map("role_id")
+  permissionId String   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
 // 用户表
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  role         String    @default("candidate") // candidate, admin, system_admin
-  studentId    String?   @map("student_id")
-  name         String?
-  college      String?
-  major        String?
-  grade        String?
-  phone        String?
-  avatar       String?
-  experience   String?   @map("experience")  // 相关经验
-  motivation   String?   @map("motivation")  // 申请动机
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String   @map("password_hash")
+  
+  // 角色关联
+  roleId         String   @map("role_id")
+  
+  // 用户状态
+  status         String   @default("active") // active, inactive, suspended
+  emailVerified  Boolean  @default(false) @map("email_verified")
+  
+  // 基本个人信息
+  name           String?
+  avatar         String?
 
-  applications       Application[]      @relation("ApplicantApplications")
-  createdRecruitments RecruitmentBatch[] @relation("AdminRecruitments")
+  // 所有其他个性化信息 (如 studentId, phone, college, major, grade, experience, motivation)
+  // 将全部通过 UserProfileField 表 (和 RegistrationField 配置) 进行管理和存储，来实现模块化和可扩展性。
+  
+  // 社团管理员特有字段
+  clubId         String?  @map("club_id")
+  
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  role           Role     @relation(fields: [roleId], references: [id])
+  club           Club?    @relation(fields: [clubId], references: [id])
+  applications   Application[]      @relation("ApplicantApplications")
+  recruitments   RecruitmentBatch[] @relation("AdminRecruitments")
   interviewFeedbacks InterviewFeedback[]
+  profileFields  UserProfileField[]
+  uploadFiles    File[]   @relation("UserFiles")
 
   @@map("users")
 }
 
-// 招新批次表
-model RecruitmentBatch {
+// 注册字段配置表
+model RegistrationField {
+  id               String   @id @default(uuid())
+  fieldName        String   @unique @map("field_name") // 字段名称: name, studentId, experience, now unique
+  fieldLabel       String   @map("field_label") // 显示标签: 姓名, 学号, 相关经验
+  fieldType        String   @map("field_type") // 字段类型: text, email, select, textarea, file, date
+  fieldOrder       Int      @map("field_order") // 字段排序
+  isRequired       Boolean  @default(false) @map("is_required") // 是否必填
+  isActive         Boolean  @default(true) @map("is_active") // 是否启用
+  options          Json? // 选项配置
+  validationRules  Json? @map("validation_rules") // 验证规则
+  placeholder      String? // 占位符文本
+  helpText         String? @map("help_text") // 帮助文本
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  userProfileFields UserProfileField[]
+
+  @@map("registration_fields")
+}
+
+// 用户档案字段表
+model UserProfileField {
   id          String   @id @default(uuid())
-  title       String
-  description String?
-  startTime   DateTime @map("start_time")
-  endTime     DateTime @map("end_time")
-  status      String   @default("draft") // draft, published, ongoing, finished, archived
-  maxApplicants Int?   @map("max_applicants")
-  requiredFields String[] @map("required_fields")
-  customQuestions Json?  @map("custom_questions")
+  userId      String   @map("user_id")
+  fieldId     String   @map("field_id")
+  fieldValue  String?  @map("field_value") // 字段值
+  fileId      String?  @map("file_id") // 关联文件ID
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  adminId     String   @map("admin_id")
-  admin       User     @relation("AdminRecruitments", fields: [adminId], references: [id])
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  field  RegistrationField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  file   File?             @relation(fields: [fileId], references: [id])
 
-  applications Application[]
+  @@unique([userId, fieldId])
+  @@map("user_profile_fields")
+}
+
+// 社团表
+model Club {
+  id          String   @id @default(uuid())
+  name        String   @unique // 社团名称
+  description String?  // 社团描述
+  category    String?  // 社团类别
+  logo        String?  // 社团Logo URL
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  admins       User[] // 社团管理员
+  recruitments RecruitmentBatch[]
+
+  @@map("clubs")
+}
+
+// 系统设置表
+model SystemSetting {
+  id          String   @id @default(uuid())
+  settingKey  String   @unique @map("setting_key") // 设置键
+  settingValue String? @map("setting_value") // 设置值
+  settingType  String   @default("string") @map("setting_type") // 值类型: string, number, boolean, json
+  description  String? // 设置描述
+  isPublic     Boolean  @default(false) @map("is_public") // 是否公开
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+// 招新批次表
+model RecruitmentBatch {
+  id             String   @id @default(uuid())
+  title          String
+  description    String?
+  startTime      DateTime @map("start_time")
+  endTime        DateTime @map("end_time")
+  status         String   @default("draft") // draft, published, ongoing, finished, archived
+  maxApplicants  Int?     @map("max_applicants")
+  requiredFields String[]  @map("required_fields")
+  customQuestions Json?   @map("custom_questions")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  adminId       String   @map("admin_id")
+  admin         User     @relation("AdminRecruitments", fields: [adminId], references: [id])
+  clubId        String?  @map("club_id")
+  club          Club?    @relation(fields: [clubId], references: [id])
+
+  applications  Application[]
 
   @@map("recruitment_batches")
 }
@@ -124,14 +253,17 @@ model InterviewFeedback {
 
 // 文件表
 model File {
-  id           String   @id @default(uuid())
-  filename     String
-  originalName String   @map("original_name")
-  mimeType     String   @map("mime_type")
-  size         BigInt
-  storagePath  String   @map("storage_path")
-  uploadedBy   String   @map("uploaded_by")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  filename      String
+  originalName  String   @map("original_name")
+  mimeType      String   @map("mime_type")
+  size          BigInt
+  storagePath   String   @map("storage_path")
+  uploadedBy    String   @map("uploaded_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user          User     @relation("UserFiles", fields: [uploadedBy], references: [id])
+  profileFields UserProfileField[]
 
   @@map("files")
 }

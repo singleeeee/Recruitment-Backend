@@ -32,6 +32,14 @@ coverage/
 test-results/
 *.lcov
 
+# 测试脚本（开发和调试用，不上传到仓库）
+# 个人测试脚本
+test-*.js
+test-*.ts
+*.test.js
+*.test.ts
+/tests/scripts/*
+
 # 构建输出
 build/
 

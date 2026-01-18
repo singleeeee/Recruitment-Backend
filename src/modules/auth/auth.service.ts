@@ -9,7 +9,6 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { PasswordUtils } from './utils/password.utils';
 import { RegisterDto, LoginDto, LoginResponseData } from './dto/auth.dto';
-import { User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -32,36 +31,84 @@ export class AuthService {
       throw new ConflictException('邮箱已被注册');
     }
 
-    // 检查学号是否已存在（如果提供了学号）
-    if (dto.studentId) {
-      const existingStudent = await this.prisma.user.findFirst({
-        where: { studentId: dto.studentId },
+    // 现在学号可能通过 profileFields 传递，需要检查是否已存在
+    const studentId = dto.profileFields?.['studentId'];
+    if (studentId) {
+      // 先找到 studentId 字段配置项
+      const studentIdField = await this.prisma.registrationField.findFirst({
+        where: { fieldName: 'studentId' }
       });
-      if (existingStudent) {
-        throw new ConflictException('学号已被使用');
+      
+      if (studentIdField) {
+        // 检查是否已有用户拥有这个学号的 profileField
+        const existingProfileField = await this.prisma.userProfileField.findFirst({
+          where: {
+            fieldValue: studentId,
+            fieldId: studentIdField.id
+          }
+        });
+        if (existingProfileField) {
+          throw new ConflictException('学号已被使用');
+        }
       }
     }
 
     try {
-      // 创建新用户
+      // 首先查找 candidate 角色
+      const candidateRole = await this.prisma.role.findUnique({
+        where: { code: 'candidate' },
+      });
+
+      if (!candidateRole) {
+        throw new BadRequestException('系统错误：未找到默认角色');
+      }
+
+      // 创建新用户 - 只包含核心固定字段和 roleId，所有其他字段都通过 profileFields 动态存储
       const user = await this.prisma.user.create({
         data: {
           email: dto.email,
           passwordHash: await PasswordUtils.hashPassword(dto.password),
           name: dto.name,
-          studentId: dto.studentId,
-          college: dto.college,
-          major: dto.major,
-          grade: dto.grade,
-          phone: dto.phone,
-          experience: dto.experience,
-          motivation: dto.motivation,
-          role: 'candidate', // 默认为候选人角色
+          // studentId, college, major, grade, phone 等现在都作为 dynamic fields 存储
+          roleId: candidateRole.id, // 关联角色ID
         },
       });
 
-      return this.createAuthResponse(user);
+        // 处理profileFields数据，创建 UserProfileField 记录
+        if (dto.profileFields && Object.keys(dto.profileFields).length > 0) {
+          for (const [fieldName, fieldValue] of Object.entries(dto.profileFields)) {
+            if (fieldValue) { // Only create if a value is provided
+              const registrationField = await this.prisma.registrationField.findFirst({
+                where: { fieldName: fieldName },
+              });
+              if (registrationField) {
+                await this.prisma.userProfileField.create({
+                  data: {
+                    userId: user.id,
+                    fieldId: registrationField.id, // Use fieldId from RegistrationField
+                    fieldValue: fieldValue as string,
+                  },
+                });
+              } else {
+                // 如果配置表中没有该字段，可以选择记录警告或抛出错误
+                console.warn(`注册字段配置中未找到 fieldName: ${fieldName}，跳过保存。`);
+              }
+            }
+          }
+        }
+
+      // 创建响应前，需要重新获取用户及其角色和动态字段
+      const userWithRelations = await this.prisma.user.findUnique({
+        where: { id: user.id },
+        include: {
+          role: true,
+          profileFields: true, // 获取所有的动态字段
+        },
+      });
+
+      return this.createAuthResponse(userWithRelations);
     } catch (error) {
+      console.error('注册失败:', error);
       throw new BadRequestException('注册失败，请稍后重试');
     }
   }
@@ -84,9 +131,13 @@ export class AuthService {
   async validateUser(
     email: string,
     password: string,
-  ): Promise<User | null> {
+  ): Promise<any | null> { // Return any to match createAuthResponse expectation
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { // Include role and profileFields for createAuthResponse
+        role: true,
+        profileFields: true,
+      },
     });
 
     if (user && await PasswordUtils.validatePassword(password, user.passwordHash)) {
@@ -107,6 +158,10 @@ export class AuthService {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
+        include: {
+          role: true,
+          profileFields: true,
+        },
       });
 
       if (!user) {
@@ -122,11 +177,11 @@ export class AuthService {
   /**
    * 创建认证响应
    */
-  private createAuthResponse(user: User): LoginResponseData {
+  private createAuthResponse(user: any): LoginResponseData { // Use any type for now to handle potential includes
     const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role,
+      role: user.role?.code || 'unknown', // Use role.code for JWT for compatibility
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -135,6 +190,14 @@ export class AuthService {
       expiresIn: '7d',
     });
 
+    // Extract dynamic profile values from profileFields
+    const profileFieldMap: { [key: string]: string } = {};
+    if (user.profileFields) {
+        user.profileFields.forEach((field: any) => {
+            profileFieldMap[field.fieldName] = field.fieldValue;
+        });
+    }
+
     return {
       accessToken,
       refreshToken,
@@ -142,14 +205,25 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name || '',
-        role: user.role,
-        studentId: user.studentId || undefined,
-        college: user.college || undefined,
-        major: user.major || undefined,
-        grade: user.grade || undefined,
+        role: user.role ? { // Provide structured role object
+          id: user.role.id,
+          name: user.role.name,
+          code: user.role.code,
+        } : null,
+        // Basic user info from User model
         avatar: user.avatar || undefined,
-        experience: user.experience || undefined,
-        motivation: user.motivation || undefined,
+        status: user.status,
+        // Common profile fields that might exist for different roles
+        studentId: profileFieldMap['studentId'] || undefined,
+        college: profileFieldMap['college'] || undefined,
+        major: profileFieldMap['major'] || undefined,
+        grade: profileFieldMap['grade'] || undefined,
+        phone: profileFieldMap['phone'] || undefined,
+        // Candidate-specific fields
+        experience: profileFieldMap['experience'] || undefined,
+        motivation: profileFieldMap['motivation'] || undefined,
+        // Additional flexible fields can be accessed via profileFieldMap
+        profileFields: profileFieldMap, // Keep the map for frontend flexibility
       },
     };
   }
