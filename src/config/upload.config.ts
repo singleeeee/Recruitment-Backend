@@ -6,7 +6,7 @@ import { BadRequestException } from '@nestjs/common';
 export const multerConfig = {
   storage: diskStorage({
     destination: (req, file, callback) => {
-      const uploadPath = process.env.UPLOAD_PATH || './uploads';
+      const uploadPath = process.env.UPLOAD_DIR || './uploads';
       
       // 根据文件类型设置不同的上传目录
       let subPath = 'others';

@@ -8,6 +8,7 @@ import { ApplicationsModule } from './modules/applications/applications.module';
 import { HealthModule } from './health/health.module';
 import { FilesModule } from './modules/files/files.module';
 import { RegistrationFieldModule } from './modules/registration-field/registration-field.module';
+import { ClubModule } from './modules/club/club.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RegistrationFieldModule } from './modules/registration-field/registrati
     ApplicationsModule,
     FilesModule,
     RegistrationFieldModule,
+    ClubModule,
   ],
   controllers: [],
   providers: [],

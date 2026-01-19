@@ -11,6 +11,9 @@ import {
   ParseUUIDPipe,
   DefaultValuePipe,
   ParseIntPipe,
+  ConflictException,
+  InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
@@ -24,10 +27,12 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PasswordUtils } from '../utils/password.utils'; // 引入 PasswordUtils
 import {
   CreateRegistrationFieldDto,
   UpdateRegistrationFieldDto,
 } from '../../registration-field/dto/registration-field.dto';
+import { CreateClubAdminDto } from '../dto/create-club-admin.dto'; // 引入新的 DTO
 
 @ApiTags('admin')
 @ApiBearerAuth('JWT-auth')
@@ -37,181 +42,10 @@ import {
 export class AdminController {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ========== 社团管理 ==========
 
-  @Get('clubs')
-  @ApiOperation({
-    summary: '获取所有社团列表',
-    description: '超级管理员查看所有社团信息',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: '页码',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: '每页数量',
-  })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: '搜索关键词（社团名称）',
-  })
-  async getAllClubs(
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-    @Query('search') search?: string,
-  ) {
-    const skip = (page - 1) * limit;
-    // 显式指定 where 的类型，帮助 TypeScript 理解 nested object
-    const where: any = search /* PrismaClient.GeneratedTypes['ClubWhereInput'] */ // 此处手动指定 any
-      ? {
-          name: {
-            contains: search,
-            mode: 'insensitive' as const, // 使用 'as const' 来指定字面量类型
-          },
-        }
-      : {};
 
-    const [clubs, total] = await Promise.all([
-      this.prisma.club.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: {
-          createdAt: 'desc',
-        },
-        include: {
-          _count: {
-            select: {
-              admins: true,
-              recruitments: true,
-            },
-          },
-        },
-      }),
-      this.prisma.club.count({ where }),
-    ]);
 
-    // 显式声明类型，确保 TypeScript 编译器知道 `club` 包含了 _count 属性
-    type ClubWithCounts = Awaited<ReturnType<typeof this.prisma.club.findMany>>[number]; // findMany 返回的每个元素类型
 
-    return {
-      data: (clubs as any[]).map((club: any) => ({ // 使用 any 彻底忽略类型检查
-        ...club,
-        adminCount: club._count.admins,
-        recruitmentCount: club._count.recruitments,
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  @Get('clubs/:id')
-  @ApiOperation({
-    summary: '获取社团详情',
-    description: '超级管理员查看指定社团的详细信息',
-  })
-  @ApiParam({
-    name: 'id',
-    description: '社团ID',
-  })
-  async getClubDetail(@Param('id', ParseUUIDPipe) clubId: string) {
-    const club = await this.prisma.club.findUnique({
-      where: { id: clubId },
-      include: {
-        admins: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            createdAt: true,
-          },
-        },
-        recruitments: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            startTime: true,
-            endTime: true,
-            createdAt: true,
-          },
-        },
-      },
-    });
-
-    if (!club) {
-      throw new Error('社团不存在');
-    }
-
-    return club;
-  }
-
-  @Post('clubs')
-  @ApiOperation({
-    summary: '创建社团',
-    description: '超级管理员创建新社团',
-  })
-  async createClub(
-    @Body()
-    createClubDto: {
-      name: string;
-      description?: string;
-      category?: string;
-      logo?: string;
-    },
-  ) {
-    return this.prisma.club.create({
-      data: createClubDto,
-    });
-  }
-
-  @Put('clubs/:id')
-  @ApiOperation({
-    summary: '更新社团信息',
-    description: '超级管理员修改社团信息',
-  })
-  async updateClub(
-    @Param('id', ParseUUIDPipe) clubId: string,
-    @Body()
-    updateClubDto: {
-      name?: string;
-      description?: string;
-      category?: string;
-      logo?: string;
-      isActive?: boolean;
-    },
-  ) {
-    return this.prisma.club.update({
-      where: { id: clubId },
-      data: updateClubDto,
-    });
-  }
-
-  @Delete('clubs/:id')
-  @ApiOperation({
-    summary: '删除社团',
-    description: '超级管理员删除社团（软删除，设置isActive为false）',
-  })
-  async deleteClub(@Param('id', ParseUUIDPipe) clubId: string) {
-    // 软删除，设置isActive为false
-    return this.prisma.club.update({
-      where: { id: clubId },
-      data: {
-        isActive: false,
-      },
-    });
-  }
 
   // ========== 用户管理 ==========
 
@@ -346,6 +180,71 @@ export class AdminController {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  @Post('users/club-admin')
+  @ApiOperation({
+    summary: '创建社团管理员账号',
+    description: '超级管理员手动创建社团管理员账号并指定其管理的社团',
+  })
+  async createClubAdmin(
+    @Body() createClubAdminDto: CreateClubAdminDto, // 使用 DTO
+  ) {
+    const { email, password, name, clubId } = createClubAdminDto;
+
+    // 1. 检查 email 是否已存在
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingUser) {
+      throw new ConflictException('该邮箱已被注册');
+    }
+
+    // 2. 从数据库获取 club_admin 角色 ID
+    const clubAdminRole = await this.prisma.role.findUnique({
+      where: { code: 'club_admin' },
+    });
+    if (!clubAdminRole) {
+      throw new InternalServerErrorException('系统错误：未找到社团管理员角色');
+    }
+
+    // 3. 验证社团 ID 是否存在
+    const clubToManage = await this.prisma.club.findUnique({
+      where: { id: clubId },
+    });
+    if (!clubToManage) {
+      throw new BadRequestException('指定的社团不存在');
+    }
+
+    // 4. 创建社团管理员账号
+    const newClubAdmin = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash: await PasswordUtils.hashPassword(password),
+        name,
+        roleId: clubAdminRole.id,
+        clubId: clubId, // 将用户与管理社团关联
+      },
+    });
+
+    // 5. 为了返回信息的完整性，可以选择包含 role 和 club 信息
+    const newClubAdminWithRelations = await this.prisma.user.findUnique({
+      where: { id: newClubAdmin.id },
+      include: {
+        role: true,
+        club: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return {
+      message: '社团管理员账号创建成功',
+      user: newClubAdminWithRelations,
     };
   }
 

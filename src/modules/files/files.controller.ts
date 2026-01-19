@@ -12,12 +12,15 @@ import {
   BadRequestException,
   StreamableFile,
   Res,
+  Req, // 导入 Req 装饰器
+  UseGuards, // 导入 UseGuards 装饰器
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
 import { FileUploadDto } from './dto/file-upload.dto';
 import { FileResponseDto } from './dto/file-response.dto';
 import { ApiTags, ApiConsumes, ApiBody, ApiProduces, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // 导入 JwtAuthGuard
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Response } from 'express';
@@ -57,14 +60,30 @@ export class FilesController {
       required: ['file'],
     },
   })
+  @UseGuards(JwtAuthGuard) // 添加 JWT 认证守卫，确保用户已登录
   async uploadFile(
     @UploadedFile() file: Express.Multer.File,
-    @CurrentUser('sub') userId: string,
+    @Req() request: any, // 使用 @Req() 注入请求对象，并从 request.user 获取 userId
     @Query() uploadDto?: FileUploadDto,
   ): Promise<{ data: FileResponseDto; message: string }> {
     if (!file) {
       throw new BadRequestException('请上传文件');
     }
+
+    // ---- IMPORTANT: 添加 console.log 以调试 ----
+    console.log("--- FilesController.uploadFile: Request Object ---");
+    console.log("request.user:", request.user);
+    // -------------------------------------------
+
+    // 1. 确保 request.user 存在，并且包含 id 属性
+    //    JwtStrategy 的 validate 方法返回的对象会赋给 request.user
+    const user = request.user;
+    if (!user || !user.id) {
+      // 这通常意味着认证失败或请求未通过 JwtAuthGuard
+      throw new BadRequestException('用户身份验证失败或无效的用户信息，请联系管理员。請確保您已登錄並擁有有效的Token。');
+    }
+
+    const userId = user.id; // 从 request.user 对象中直接获取 id
 
     const uploadedFile = await this.filesService.uploadFile(
       file,

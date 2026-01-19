@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { File } from '@prisma/client';
 import * as mime from 'mime-types';
@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class FilesService {
+export class FilesService implements OnModuleInit {
   private readonly uploadPath: string;
   private readonly maxFileSize = 10 * 1024 * 1024; // 10MB
   private readonly allowedMimeTypes = [
@@ -25,7 +25,28 @@ export class FilesService {
     private prisma: PrismaService,
     private configService: ConfigService,
   ) {
-    this.uploadPath = this.configService.get('UPLOAD_PATH') || 'uploads';
+    // 使用环境变量或默认路径
+    const envUploadDir = process.env.UPLOAD_DIR;
+    let configUploadDir;
+    try {
+      configUploadDir = this.configService.get('UPLOAD_DIR');
+    } catch (error) {
+      console.error('Error getting UPLOAD_DIR from ConfigService:', error);
+    }
+    
+    // 优先使用ConfigService，然后环境变量，最后使用默认值
+    this.uploadPath = configUploadDir || envUploadDir || 'uploads';
+    
+    // 确保uploadPath不为undefined或null
+    if (!this.uploadPath) {
+      this.uploadPath = 'uploads';
+    }
+    
+    // 确保路径是绝对路径
+    if (!path.isAbsolute(this.uploadPath)) {
+      this.uploadPath = path.resolve(process.cwd(), this.uploadPath);
+    }
+    
     this.ensureUploadDirectoryExists();
   }
 
@@ -33,6 +54,10 @@ export class FilesService {
     if (!fs.existsSync(this.uploadPath)) {
       fs.mkdirSync(this.uploadPath, { recursive: true });
     }
+  }
+
+  onModuleInit() {
+    console.log('FilesService initialized with uploadPath:', this.uploadPath);
   }
 
   private validateFile(file: Express.Multer.File): void {
@@ -72,23 +97,40 @@ export class FilesService {
     uploadedBy: string,
     category: string = 'resume',
   ): Promise<File> {
-    // 验证文件
+    // 1. 再次验证用户ID是否已提供 (虽然Controller应该已经检查)
+    if (!uploadedBy) {
+      throw new BadRequestException('无效的用户凭证，用户ID缺失。');
+    }
+
+    // 2. 显示检查用户是否存在并获取用户名
+    const user = await this.prisma.user.findUnique({
+      where: { id: uploadedBy },
+      select: { id: true, name: true }, // 同时获取 name 字段
+    });
+    if (!user) {
+      throw new BadRequestException(`当前操作的用户ID不存在，请检查您的账户状态或联系管理员。`);
+    }
+
+    // 3. 验证文件
     this.validateFile(file);
 
-    // 生成唯一文件名
+    // 4. 生成唯一文件名
     const filename = this.generateUniqueFilename(file.originalname);
-    
-    // 创建用户专属目录
-    const userUploadPath = path.join(this.uploadPath, uploadedBy, category);
+
+    // 5. 创建用户专属目录 (使用 userName 替换 uploadedBy)
+    //    请注意：如果用户的 name 是 null 或 undefined，这可能造成问题。
+    //    这里我们假设用户都具有有效 name 或 Prisma Schema 可以确保其非空
+    const userName = user.name || `user_${uploadedBy}`; // 如果 name 为空，则回退到旧格式
+    const userUploadPath = path.join(this.uploadPath, userName, category);
     if (!fs.existsSync(userUploadPath)) {
       fs.mkdirSync(userUploadPath, { recursive: true });
     }
 
-    // 保存文件
+    // 6. 保存文件
     const filePath = path.join(userUploadPath, filename);
     fs.writeFileSync(filePath, file.buffer);
 
-    // 保存到数据库
+    // 7. 保存到数据库
     return this.prisma.file.create({
       data: {
         filename,

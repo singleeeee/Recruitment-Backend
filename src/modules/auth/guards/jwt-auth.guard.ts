@@ -24,7 +24,16 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
   }
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext, status?: any) {
+    // ---- IMPORTANT: 添加 console.log 以调试 ----
+    console.log("--- JwtAuthGuard.handleRequest: JWT Verification Failed ---");
+    console.log("Error object:", err);
+    console.log("User object:", user); // 通常为 null
+    console.log("Info object:", info); // 这是 JWT 验证失败的具体原因，非常重要！
+    // ---------------------------------------
+
     if (err || !user) {
+      // 这里的错误消息可能需要调整，以提供更具体的用户反馈
+      // 目前的实现只是简单地抛出一个通用的 UnauthorizedException
       throw err || new UnauthorizedException('无效或过期的访问令牌');
     }
     return user;
