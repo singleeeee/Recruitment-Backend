@@ -10,9 +10,15 @@ export const swaggerConfig = new DocumentBuilder()
     '### 认证模块 (/auth)\n' +
     '- 用户注册、登录\n' +
     '- JWT 令牌管理和刷新\n\n' +
-    '### 用户管理 (/users)\n' +
+        '### 用户管理 (/users)\n' +
     '- 用户信息管理\n' +
     '- 个人资料获取\n\n' +
+
+    '### 角色权限管理 (/roles, /permissions)\n' +
+    '- 角色管理：获取、创建、更新、删除角色\n' +
+    '- 权限管理：权限列表、分配权限\n' +
+    '- 角色权限分配和验证\n\n' +
+
     '### 系统监控 (/health)\n' +
     '- 数据库连接状态检查\n' +
     '- 系统健康状态监控\n\n' +
@@ -42,6 +48,8 @@ export const swaggerConfig = new DocumentBuilder()
   )
   .addTag('auth', '用户认证相关接口')
   .addTag('users', '用户管理相关接口')
+  .addTag('roles', '角色管理相关接口')
+  .addTag('permissions', '权限管理相关接口')
   .addTag('health', '系统健康检查')
   .setContact('开发团队', 'https://github.com/recruitment-system', 'dev@recruitment.com')
   .setLicense('MIT License', 'https://opensource.org/licenses/MIT')

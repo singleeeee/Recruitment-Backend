@@ -5,6 +5,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { AdminController } from './controllers/admin.controller';
+import { RoleController } from './controllers/role.controller';
+import { PermissionController } from './controllers/permission.controller';
+import { RoleService } from './services/role.service';
+import { PermissionService } from './services/permission.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RegistrationFieldModule } from '../registration-field/registration-field.module';
 import { LocalStrategy } from './strategies/local.strategy';
@@ -28,8 +32,8 @@ import { RolesGuard } from './guards/roles.guard';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController, AdminController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, JwtAuthGuard, RolesGuard],
-  exports: [AuthService, JwtAuthGuard, RolesGuard],
+  controllers: [AuthController, AdminController, RoleController, PermissionController],
+  providers: [AuthService, RoleService, PermissionService, LocalStrategy, JwtStrategy, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, RoleService, PermissionService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

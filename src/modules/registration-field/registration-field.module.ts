@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { RegistrationFieldController } from './registration-field.controller';
+import { RegistrationFieldService } from './registration-field.service';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  providers: [PrismaService],
-  exports: [PrismaService],
+  imports: [PrismaModule],
+  controllers: [RegistrationFieldController],
+  providers: [RegistrationFieldService],
+  exports: [RegistrationFieldService],
 })
 export class RegistrationFieldModule {}

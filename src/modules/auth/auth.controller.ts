@@ -14,6 +14,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { Public } from './decorators/public.decorator'; // 导入 Public 装饰器
 import { RegisterDto, LoginDto, LoginResponseData } from './dto/auth.dto';
 
 @ApiTags('auth')
@@ -64,6 +65,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Public() // 明确标记此路由为公开，绕过任何潜在的全局JWT Guard
   @UseGuards(AuthGuard('local'))
   @ApiOperation({
     summary: '用户登录',

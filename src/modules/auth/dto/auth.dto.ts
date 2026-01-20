@@ -67,6 +67,7 @@ export class RegisterDto {
     description: '邀请人邮箱',
     required: false,
   })
+  @IsOptional()
   @IsEmail({}, { message: '邀请人邮箱格式无效' })
   inviterEmail?: string;
 

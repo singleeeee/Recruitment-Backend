@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateClubDto {
@@ -21,4 +21,15 @@ export class CreateClubDto {
   @IsString()
   @IsOptional()
   logo?: string;
+
+  @ApiProperty({ 
+    example: ['123e4567-e89b-12d3-a456-426614174000'], 
+    description: '社团管理员ID数组（可选，创建社团时不指定管理员）',
+    required: false,
+    type: [String]
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  adminIds?: string[];
 }

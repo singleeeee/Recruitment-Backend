@@ -59,7 +59,7 @@ export class RegistrationFieldController {
   }
 
   // --- 公开 API，前端获取启用的注册字段配置 ---
-  @Get() // /api/v1/registration-fields
+  @Get('active') // /api/v1/registration-fields/active
   @ApiOperation({ summary: '获取所有启用的注册字段配置 (用于前端渲染注册表单)' })
   findAllActive() {
     return this.registrationFieldService.findAllActive();

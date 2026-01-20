@@ -1,51 +1,76 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { swaggerConfig } from './config/swagger.config';
-import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
 
-  // 全局验证管道
+  // CORS configuration
+  app.enableCors({
+    origin: configService.get<string>('CORS_ORIGIN') || '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
+
+  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: false,  // 允许非白名单字段
-      forbidNonWhitelisted: false,  // 不禁止非白名单字段    
+      whitelist: true,
+      forbidNonWhitelisted: true,
       transform: true,
     }),
   );
 
-  // 全局响应拦截器
-  app.useGlobalInterceptors(new ResponseInterceptor());
-
-  // 全局异常过滤器
-  app.useGlobalFilters(new HttpExceptionFilter());
-
-  // CORS 配置
-  app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true,
-  });
-
-  // 全局路由前缀
+  // Global route prefix
   app.setGlobalPrefix('api/v1');
 
-  // Swagger 配置
-  const config = swaggerConfig;
-
+  // Swagger configuration
+  const config = new DocumentBuilder()
+    .setTitle('Recruitment Backend API')
+    .setDescription('招新系统后端API文档 - 包含用户认证、招新管理、申请管理、角色权限管理等功能')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth', // This name will be used in the @ApiBearerAuth() decorator
+    )
+    .addTag('auth', '用户认证相关接口')
+    .addTag('users', '用户管理相关接口')
+    .addTag('admin', '管理员相关接口')
+    .addTag('recruitment', '招新管理相关接口')
+    .addTag('applications', '申请管理相关接口')
+    .addTag('ai', 'AI功能相关接口')
+    .addTag('files', '文件管理相关接口')
+    .addTag('clubs', '社团管理相关接口')
+    .addTag('roles', '角色管理相关接口')
+    .addTag('permissions', '权限管理相关接口')
+    .addTag('Registration Fields', '注册字段管理相关接口')
+    .build();
+  
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
-      persistAuthorization: true, // 保持授权信息
+      persistAuthorization: true,
+      defaultModelsExpandDepth: -1,
+      tagsSorter: 'alpha', // Sort tags alphabetically
+      operationsSorter: 'alpha', // Sort operations alphabetically
     },
+    customSiteTitle: 'Recruitment System API Docs',
+    customCss: '.swagger-ui .topbar { background-color: #f8f9fa; } .swagger-ui .info { margin: 20px 0; }',
   });
 
-  const port = process.env.PORT || 3001;
+  const port = configService.get<number>('PORT') || 3001;
   await app.listen(port);
-  
+
   console.log(`🚀 Application is running on: http://localhost:${port}`);
   console.log(`📚 API文档地址: http://localhost:${port}/api/docs`);
 }

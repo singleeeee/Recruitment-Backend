@@ -27,7 +27,7 @@ import {
 } from '@nestjs/swagger';
 import { ClubService } from './club.service';
 import { CreateClubDto } from './dto/create-club.dto';
-import { UpdateClubDto } from './dto/update-club.dto';
+import { UpdateClubDto, UpdateClubAdminsDto, AddClubAdminDto, RemoveClubAdminDto } from './dto/update-club.dto';
 
 @ApiTags('clubs')
 @ApiBearerAuth('JWT-auth')
@@ -115,5 +115,57 @@ export class ClubController {
   })
   async deleteClub(@Param('id', ParseUUIDPipe) clubId: string) {
     return this.clubService.remove(clubId);
+  }
+
+  @Put(':id/admins')
+  @ApiOperation({
+    summary: '更新社团管理员',
+    description: '超级管理员替换社团的所有管理员',
+  })
+  @ApiParam({
+    name: 'id',
+    description: '社团ID',
+  })
+  async updateClubAdmins(
+    @Param('id', ParseUUIDPipe) clubId: string,
+    @Body() updateClubAdminsDto: UpdateClubAdminsDto,
+  ) {
+    return this.clubService.updateClubAdmins(clubId, updateClubAdminsDto);
+  }
+
+  @Post(':id/admins')
+  @ApiOperation({
+    summary: '添加社团管理员',
+    description: '超级管理员为社团添加新的管理员',
+  })
+  @ApiParam({
+    name: 'id',
+    description: '社团ID',
+  })
+  async addClubAdmin(
+    @Param('id', ParseUUIDPipe) clubId: string,
+    @Body() addClubAdminDto: AddClubAdminDto,
+  ) {
+    return this.clubService.addClubAdmin(clubId, addClubAdminDto);
+  }
+
+  @Delete(':id/admins/:adminId')
+  @ApiOperation({
+    summary: '移除社团管理员',
+    description: '超级管理员从社团移除指定的管理员',
+  })
+  @ApiParam({
+    name: 'id',
+    description: '社团ID',
+  })
+  @ApiParam({
+    name: 'adminId',
+    description: '要移除的管理员ID',
+  })
+  async removeClubAdmin(
+    @Param('id', ParseUUIDPipe) clubId: string,
+    @Param('adminId', ParseUUIDPipe) adminId: string,
+  ) {
+    return this.clubService.removeClubAdmin(clubId, { adminId });
   }
 }

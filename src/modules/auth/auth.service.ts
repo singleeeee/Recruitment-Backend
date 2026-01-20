@@ -132,6 +132,9 @@ export class AuthService {
     email: string,
     password: string,
   ): Promise<any | null> { // Return any to match createAuthResponse expectation
+    // ---- 添加调试日志 ----
+    console.log(`[AuthService.validateUser DEBUG] Attempting to find user by email: ${email}`);
+    // ---------------------
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { // Include role and profileFields for createAuthResponse
@@ -140,7 +143,20 @@ export class AuthService {
       },
     });
 
-    if (user && await PasswordUtils.validatePassword(password, user.passwordHash)) {
+    // ---- 添加调试日志 ----
+    if (!user) {
+      console.log(`[AuthService.validateUser DEBUG] No user found with email: ${email}`);
+      return null;
+    }
+    console.log(`[AuthService.validateUser DEBUG] User found with email: ${email}. User ID: ${user.id}. Now validating password.`);
+    // ---------------------
+
+    // ---- 添加调试日志 ----
+    const isPasswordValid = await PasswordUtils.validatePassword(password, user.passwordHash);
+    console.log(`[AuthService.validateUser DEBUG] Password validation result for email ${email}: ${isPasswordValid}`);
+    // ---------------------
+
+    if (user && isPasswordValid) {
       return user;
     }
 

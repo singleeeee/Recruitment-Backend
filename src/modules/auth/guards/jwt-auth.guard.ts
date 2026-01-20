@@ -31,6 +31,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
     console.log("Info object:", info); // 这是 JWT 验证失败的具体原因，非常重要！
     // ---------------------------------------
 
+    // 临时解决方案: 如果请求是到 /auth/login，则忽略所有 JWT 错误并返回 null 用户
+    const request = context.switchToHttp().getRequest();
+    const path = request?.url; // 获取请求路径
+
+    if (path && path.includes('/auth/login')) {
+      console.warn('警告: JwtAuthGuard 拦截了 /auth/login 请求。由于此路由需公开访问，已临时放行。');
+      return null; // 直接返回 null 用户，绕过 JWT 验证
+    }
+
     if (err || !user) {
       // 这里的错误消息可能需要调整，以提供更具体的用户反馈
       // 目前的实现只是简单地抛出一个通用的 UnauthorizedException
