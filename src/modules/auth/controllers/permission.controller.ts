@@ -37,7 +37,7 @@ import {
 @ApiBearerAuth('JWT-auth')
 @Controller('permissions')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('system_admin')
+@Roles('super_admin')
 export class PermissionController {
   constructor(private readonly permissionService: PermissionService) {}
 
@@ -80,7 +80,7 @@ export class PermissionController {
               {
                 id: 'role-id',
                 name: '超级管理员',
-                code: 'system_admin'
+                code: 'super_admin'
               }
             ]
           }

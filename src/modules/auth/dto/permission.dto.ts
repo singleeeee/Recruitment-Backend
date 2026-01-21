@@ -110,7 +110,7 @@ export class PermissionResponseDto {
       {
         id: 'role-id',
         name: '超级管理员',
-        code: 'system_admin'
+        code: 'super_admin'
       }
     ],
     description: '拥有此权限的角色列表'

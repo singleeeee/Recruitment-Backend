@@ -37,7 +37,7 @@ import {
 @ApiBearerAuth('JWT-auth')
 @Controller('roles')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('system_admin')
+@Roles('super_admin')
 export class RoleController {
   constructor(private readonly roleService: RoleService) {}
 
@@ -64,8 +64,8 @@ export class RoleController {
         data: [
           {
             id: '123e4567-e89b-12d3-a456-426614174000',
-            name: '超级管理员',
-            code: 'system_admin',
+            name: '系统管理员',
+            code: 'super_admin',
             description: '系统最高权限管理员',
             level: 2,
             isActive: true,
@@ -140,7 +140,7 @@ export class RoleController {
   @ApiParam({
     name: 'code',
     description: '角色代码',
-    example: 'system_admin'
+    example: 'super_admin'
   })
   @ApiResponse({
     status: 200,

@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor'; // 导入 ResponseInterceptor
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -26,6 +27,9 @@ async function bootstrap() {
 
   // Global route prefix
   app.setGlobalPrefix('api/v1');
+
+  // Global Response Interceptor for unified response format
+  app.useGlobalInterceptors(new ResponseInterceptor());
 
   // Swagger configuration
   const config = new DocumentBuilder()

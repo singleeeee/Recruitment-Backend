@@ -146,7 +146,7 @@ CREATE TABLE system_settings (
 ### 默认角色数据
 ```sql
 INSERT INTO roles (name, code, description, level) VALUES 
-('超级管理员', 'system_admin', '系统最高权限管理员', 2),
+('系统管理员', 'super_admin', '系统最高权限管理员', 2),
 ('社团负责人', 'club_admin', '社团管理员，负责招新管理', 1),
 ('候选人', 'candidate', '系统用户，可以申请加入社团', 0);
 ```

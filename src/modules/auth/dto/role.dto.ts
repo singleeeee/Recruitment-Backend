@@ -7,14 +7,15 @@ import {
   IsArray,
   MaxLength,
   Min,
-  Max
+  Max,
+  IsUrl
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class CreateRoleDto {
   @ApiProperty({
-    example: '超级管理员',
+    example: '系统管理员',
     description: '角色名称'
   })
   @IsString({ message: '角色名称必须是字符串' })
@@ -23,7 +24,7 @@ export class CreateRoleDto {
   name: string;
 
   @ApiProperty({
-    example: 'system_admin',
+    example: 'super_admin',
     description: '角色代码，唯一标识'
   })
   @IsString({ message: '角色代码必须是字符串' })
@@ -43,7 +44,7 @@ export class CreateRoleDto {
 
   @ApiProperty({
     example: 2,
-    description: '角色级别 (0:候选人, 1:社团管理员, 2:超级管理员)',
+    description: '角色级别 (0:候选人, 1:社团管理员, 2:系统管理员)',
     minimum: 0,
     maximum: 2
   })
@@ -66,7 +67,7 @@ export class CreateRoleDto {
 
 export class UpdateRoleDto {
   @ApiProperty({
-    example: '超级管理员',
+    example: '系统管理员',
     description: '角色名称',
     required: false
   })
@@ -87,7 +88,7 @@ export class UpdateRoleDto {
 
   @ApiProperty({
     example: 2,
-    description: '角色级别 (0:候选人, 1:社团管理员, 2:超级管理员)',
+    description: '角色级别 (0:候选人, 1:社团管理员, 2:系统管理员)',
     minimum: 0,
     maximum: 2,
     required: false
@@ -131,6 +132,84 @@ export class AssignPermissionsDto {
   permissionCodes: string[];
 }
 
+export class UpdateUserRoleDto {
+  @ApiProperty({
+    example: 'club_admin',
+    description: '要分配的角色代码: candidate, club_admin, system_admin',
+    enum: ['candidate', 'club_admin', 'system_admin']
+  })
+  @IsString({ message: '角色代码必须是字符串' })
+  @IsNotEmpty({ message: '角色代码不能为空' })
+  roleCode: string;
+}
+
+export class UpdateUserInfoDto {
+  @ApiProperty({
+    example: 'club_admin',
+    description: '要分配的角色代码: candidate, club_admin, system_admin',
+    enum: ['candidate', 'club_admin', 'system_admin'],
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: '角色代码必须是字符串' })
+  roleCode?: string;
+
+  @ApiProperty({
+    example: 'active',
+    description: '用户状态: active, inactive, suspended',
+    enum: ['active', 'inactive', 'suspended'],
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: '用户状态必须是字符串' })
+  status?: 'active' | 'inactive' | 'suspended';
+
+  @ApiProperty({
+    example: '张三',
+    description: '用户姓名',
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: '姓名必须是字符串' })
+  @MaxLength(100, { message: '姓名不能超过100个字符' })
+  name?: string;
+
+  @ApiProperty({
+    example: 'https://example.com/avatar.jpg',
+    description: '用户头像URL',
+    required: false
+  })
+  @IsOptional()
+  @IsUrl({}, { message: '头像URL格式不正确' })
+  avatar?: string;
+
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description: '用户档案字段数据，根据RegistrationField配置动态生成',
+    example: {
+      studentId: '2021001001',
+      phone: '15706623209',
+      college: '计算机学院',
+      major: '计算机科学与技术',
+      grade: '2021级',
+      experience: '我的相关经验是...',
+      motivation: '我加入的动机是...',
+    }
+  })
+  @IsOptional()
+  profileFields?: { [key: string]: string };
+
+  @ApiProperty({
+    example: '账号异常，暂时停用',
+    description: '状态修改原因',
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: '状态修改原因必须是字符串' })
+  statusReason?: string;
+}
+
 export class RoleResponseDto {
   @ApiProperty({
     example: '123e4567-e89b-12d3-a456-426614174000',
@@ -145,7 +224,7 @@ export class RoleResponseDto {
   name: string;
 
   @ApiProperty({
-    example: 'system_admin',
+    example: 'super_admin',
     description: '角色代码'
   })
   code: string;

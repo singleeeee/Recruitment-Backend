@@ -11,6 +11,7 @@ import { RoleService } from './services/role.service';
 import { PermissionService } from './services/permission.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RegistrationFieldModule } from '../registration-field/registration-field.module';
+import { UsersService } from '../users/users.service';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -33,7 +34,7 @@ import { RolesGuard } from './guards/roles.guard';
     }),
   ],
   controllers: [AuthController, AdminController, RoleController, PermissionController],
-  providers: [AuthService, RoleService, PermissionService, LocalStrategy, JwtStrategy, JwtAuthGuard, RolesGuard],
+  providers: [AuthService, RoleService, PermissionService, UsersService, LocalStrategy, JwtStrategy, JwtAuthGuard, RolesGuard],
   exports: [AuthService, RoleService, PermissionService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

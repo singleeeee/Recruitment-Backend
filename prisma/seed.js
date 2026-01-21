@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 const initialRoles = [
-  { name: '超级管理员', code: 'system_admin', description: '拥有所有权限，管理其他管理员和系统配置', isActive: true },
+  { name: '系统管理员', code: 'super_admin', description: '拥有所有权限，管理其他管理员和系统配置', isActive: true },
   { name: '社团管理员', code: 'club_admin', description: '管理社团的候选人、招新批次、通知等', isActive: true },
   { name: '候选人', code: 'candidate', description: '申请加入社团的用户', isActive: true },
 ];
@@ -38,7 +38,7 @@ const initialPermissions = [
 ];
 
 const rolePermissionsMap = {
-  system_admin: ['user_read', 'user_create', 'user_update', 'user_delete', 'role_read', 'role_create', 'role_update', 'role_delete', 'recruitment_read', 'recruitment_create', 'recruitment_update', 'recruitment_delete', 'application_read', 'application_update', 'application_delete', 'file_read', 'file_upload', 'file_download', 'file_delete', 'systemsetting_read', 'systemsetting_manage', 'registrationfield_read', 'registrationfield_manage', 'club_read', 'club_manage'],
+  super_admin: ['user_read', 'user_create', 'user_update', 'user_delete', 'role_read', 'role_create', 'role_update', 'role_delete', 'recruitment_read', 'recruitment_create', 'recruitment_update', 'recruitment_delete', 'application_read', 'application_update', 'application_delete', 'file_read', 'file_upload', 'file_download', 'file_delete', 'systemsetting_read', 'systemsetting_manage', 'registrationfield_read', 'registrationfield_manage', 'club_read', 'club_manage'],
   club_admin: ['recruitment_read', 'recruitment_create', 'recruitment_update', 'recruitment_delete', 'application_read', 'application_update', 'application_delete', 'file_read', 'file_upload', 'file_download', 'file_delete'],
   candidate: ['file_upload', 'file_download'],
 };
@@ -111,18 +111,18 @@ async function main() {
   }
   console.log('已完成角色与权限关联。');
 
-  const superAdminRole = createdRoles.find(r => r.code === 'super_admin');
-  if (!superAdminRole) { throw new Error('超级管理员角色未找到，无法创建默认超级管理员。'); }
+  const systemAdminRole = createdRoles.find(r => r.code === 'super_admin');
+  if (!systemAdminRole) { throw new Error('系统管理员角色未找到，无法创建默认系统管理员。'); }
 
-  const defaultSuperAdminPwd = 'Root123!';
-  const hashedPassword = await bcrypt.hash(defaultSuperAdminPwd, 10);
+  const defaultSystemAdminPwd = 'Root123!';
+  const hashedPassword = await bcrypt.hash(defaultSystemAdminPwd, 10);
 
-  const superAdminUser = await prisma.user.upsert({
+  const systemAdminUser = await prisma.user.upsert({
     where: { email: 'root@recruitment.com' },
-    update: { roleId: superAdminRole.id, passwordHash: hashedPassword, name: '超级管理员', status: 'active', emailVerified: true, },
-    create: { email: 'root@recruitment.com', passwordHash: hashedPassword, name: '超级管理员', roleId: superAdminRole.id, status: 'active', emailVerified: true, },
+    update: { roleId: systemAdminRole.id, passwordHash: hashedPassword, name: '系统管理员', status: 'active', emailVerified: true, },
+    create: { email: 'root@recruitment.com', passwordHash: hashedPassword, name: '系统管理员', roleId: systemAdminRole.id, status: 'active', emailVerified: true, },
   });
-  console.log(`已创建/更新超级管理员用户: ${superAdminUser.email}，默认密码: ${defaultSuperAdminPwd}`);
+  console.log(`已创建/更新系统管理员用户: ${systemAdminUser.email}，默认密码: ${defaultSystemAdminPwd}`);
 
   for (const fieldData of initialRegistrationFields) {
     await prisma.registrationField.create({
