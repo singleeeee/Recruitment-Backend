@@ -42,13 +42,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('用户不存在');
     }
 
-    // 为了满足 RolesGuard 的期望，重命名数据库查询返回的 role 对象为 roleInfo
-    // 并将 JWT payload 中的 role code 字符串赋值给 user.role
-    const { role: roleInfo, ...userData } = user;
+    // 注意：这里我们将 JWT payload 中的 'role' (其值是 role code 字符串) 直接赋给 user 对象
+    // RolesGuard 将检查这个 `user.role` 属性
+    // `user.roleId` 是从数据库获取的 Role 表的主键 ID
     return {
-      ...userData,
+      ...user,
       role: payload.role, // Role CODE from JWT Payload for RolesGuard
-      roleInfo, // 保留完整的角色信息对象供其他使用
     };
   }
 }

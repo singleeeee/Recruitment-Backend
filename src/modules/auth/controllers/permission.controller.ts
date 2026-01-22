@@ -92,23 +92,14 @@ export class PermissionController {
   async getPermissions(
     @Query('module') module?: string,
     @Query('keyword') keyword?: string
-  ): Promise<PermissionListResponseDto> {
-    let permissions: PermissionResponseDto[];
-    
+  ) {
     if (module) {
-      permissions = await this.permissionService.getPermissionsByModuleName(module);
+      return this.permissionService.getPermissionsByModuleName(module);
     } else if (keyword) {
-      permissions = await this.permissionService.searchPermissions(keyword);
+      return this.permissionService.searchPermissions(keyword);
     } else {
-      permissions = await this.permissionService.getAllPermissions();
+      return this.permissionService.getAllPermissions();
     }
-    
-    return {
-      success: true,
-      message: '获取权限列表成功',
-      data: permissions,
-      timestamp: new Date().toISOString()
-    };
   }
 
   @Get('grouped')
@@ -143,15 +134,8 @@ export class PermissionController {
       }
     }
   })
-  async getGroupedPermissions(): Promise<GroupedPermissionsResponseDto> {
-    const groupedPermissions = await this.permissionService.getPermissionsByModule();
-    
-    return {
-      success: true,
-      message: '获取分组权限列表成功',
-      data: groupedPermissions,
-      timestamp: new Date().toISOString()
-    };
+  async getGroupedPermissions() {
+    return this.permissionService.getPermissionsByModule();
   }
 
   @Get('modules')
@@ -171,15 +155,8 @@ export class PermissionController {
       }
     }
   })
-  async getModules(): Promise<{ success: boolean; message: string; data: string[]; timestamp: string }> {
-    const modules = await this.permissionService.getAllModules();
-    
-    return {
-      success: true,
-      message: '获取模块列表成功',
-      data: modules,
-      timestamp: new Date().toISOString()
-    };
+  async getModules() {
+    return this.permissionService.getAllModules();
   }
 
   @Get('stats')
@@ -209,20 +186,8 @@ export class PermissionController {
       }
     }
   })
-  async getPermissionStats(): Promise<{
-    success: boolean;
-    message: string;
-    data: any;
-    timestamp: string;
-  }> {
-    const stats = await this.permissionService.getPermissionStats();
-    
-    return {
-      success: true,
-      message: '获取统计信息成功',
-      data: stats,
-      timestamp: new Date().toISOString()
-    };
+  async getPermissionStats() {
+    return this.permissionService.getPermissionStats();
   }
 
   @Get(':id')

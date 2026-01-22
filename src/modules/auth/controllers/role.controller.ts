@@ -95,16 +95,9 @@ export class RoleController {
   })
   async getAllRoles(
     @Query('includeInactive') includeInactive: string = 'false'
-  ): Promise<RoleListResponseDto> {
+  ) {
     const includeInactiveBool = includeInactive === 'true';
-    const roles = await this.roleService.getAllRoles(includeInactiveBool);
-    
-    return {
-      success: true,
-      message: '获取角色列表成功',
-      data: roles,
-      timestamp: new Date().toISOString()
-    };
+    return this.roleService.getAllRoles(includeInactiveBool);
   }
 
   @Get(':id')
@@ -323,14 +316,13 @@ export class RoleController {
     example: '123e4567-e89b-12d3-a456-426614174000'
   })
   @ApiBody({
+    type: AssignPermissionsDto, // Use the DTO here for automatic validation and Swagger docs
     description: '要添加的权限代码数组',
-    schema: {
-      type: 'object',
-      properties: {
-        permissionCodes: {
-          type: 'array',
-          items: { type: 'string' },
-          example: ['user_read', 'user_create']
+    examples: {
+      example1: {
+        summary: '添加权限示例',
+        value: {
+          permissionCodes: ['user_read', 'user_create']
         }
       }
     }
@@ -350,9 +342,10 @@ export class RoleController {
   })
   async addPermissions(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('permissionCodes') permissionCodes: string[]
+    @Body() addPermissionsDto: AssignPermissionsDto // Use the full DTO
   ): Promise<RoleResponseDto> {
-    return this.roleService.addPermissions(id, permissionCodes);
+    // Pass the permissionCodes extracted from the validated DTO to the service
+    return this.roleService.addPermissions(id, addPermissionsDto.permissionCodes);
   }
 
   @Delete(':id/permissions/remove')
@@ -422,15 +415,8 @@ export class RoleController {
   })
   async getRolePermissionCodes(
     @Param('id', ParseUUIDPipe) id: string
-  ): Promise<{ success: boolean; message: string; data: string[]; timestamp: string }> {
-    const permissionCodes = await this.roleService.getRolePermissionCodes(id);
-    
-    return {
-      success: true,
-      message: '获取角色权限代码成功',
-      data: permissionCodes,
-      timestamp: new Date().toISOString()
-    };
+  ): Promise<string[]> {
+    return this.roleService.getRolePermissionCodes(id);
   }
 
   @Get(':id/has-permission/:permissionCode')
@@ -467,14 +453,9 @@ export class RoleController {
   async checkRolePermission(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('permissionCode') permissionCode: string
-  ): Promise<{ success: boolean; message: string; data: { hasPermission: boolean }; timestamp: string }> {
+  ): Promise<{ hasPermission: boolean }> {
     const hasPermission = await this.roleService.roleHasPermission(id, permissionCode);
     
-    return {
-      success: true,
-      message: '权限检查完成',
-      data: { hasPermission },
-      timestamp: new Date().toISOString()
-    };
+    return { hasPermission };
   }
 }

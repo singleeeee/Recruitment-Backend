@@ -58,7 +58,7 @@
 
 ### 4. 访问控制
 
-- 所有角色权限管理接口都需要 `system_admin` 权限
+- 所有角色权限管理接口都需要 `super_admin` 权限
 - 使用 JWT 认证
 - 权限验证通过 RolesGuard 实现
 

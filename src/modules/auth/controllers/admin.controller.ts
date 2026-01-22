@@ -11,8 +11,6 @@ import {
   ParseUUIDPipe,
   DefaultValuePipe,
   ParseIntPipe,
-  HttpCode,
-  HttpStatus,
   ConflictException,
   InternalServerErrorException,
   BadRequestException,
@@ -219,60 +217,9 @@ export class AdminController {
   }
 
   @Post('users/club-admin')
-  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: '创建社团管理员账号',
     description: '超级管理员手动创建社团管理员账号并指定其管理的社团',
-  })
-  @ApiBody({
-    type: CreateClubAdminDto,
-    description: '社团管理员账号创建信息',
-    examples: {
-      example1: {
-        summary: '创建社团管理员示例',
-        value: {
-          email: 'clubadmin@example.com',
-          password: 'password123',
-          name: '张管理员',
-          clubId: '123e4567-e89b-12d3-a456-426614174000'
-        }
-      }
-    }
-  })
-  @ApiResponse({
-    status: 201,
-    description: '社团管理员账号创建成功',
-    schema: {
-      example: {
-        message: '社团管理员账号创建成功',
-        user: {
-          id: '123e4567-e89b-12d3-a456-426614174001',
-          email: 'clubadmin@example.com',
-          name: '张管理员',
-          role: {
-            id: '123e4567-e89b-12d3-a456-426614174002',
-            name: '社团管理员',
-            code: 'club_admin'
-          },
-          club: {
-            id: '123e4567-e89b-12d3-a456-426614174000',
-            name: '计算机协会'
-          }
-        }
-      }
-    }
-  })
-  @ApiResponse({
-    status: 400,
-    description: '请求参数错误或社团不存在',
-  })
-  @ApiResponse({
-    status: 409,
-    description: '邮箱已被注册',
-  })
-  @ApiResponse({
-    status: 500,
-    description: '系统错误，如角色不存在',
   })
   async createClubAdmin(
     @Body() createClubAdminDto: CreateClubAdminDto, // 使用 DTO
@@ -477,7 +424,7 @@ export class AdminController {
     }
 
     // 超级管理员不能修改其他超级管理员的角色
-    if (existingUser.role?.code === 'system_admin') {
+    if (existingUser.role?.code === 'super_admin') {
       throw new ForbiddenException('不能修改超级管理员的角色');
     }
 

@@ -19,6 +19,31 @@ export const swaggerConfig = new DocumentBuilder()
     '- 权限管理：权限列表、分配权限\n' +
     '- 角色权限分配和验证\n\n' +
 
+    '### 招新管理 (/recruitment)\n' +
+    '- 招新批次管理：创建、更新、发布招新活动\n' +
+    '- 招新信息查询：获取招新列表和详情\n' +
+    '- 招新状态管理\n\n' +
+
+    '### 申请管理 (/applications)\n' +
+    '- 申请提交：候选人提交申请材料\n' +
+    '- 申请审核：管理员审核申请\n' +
+    '- 申请状态流转管理\n\n' +
+
+    '### 文件管理 (/files)\n' +
+    '- 文件上传：支持简历、作品集等文件\n' +
+    '- 文件下载：安全的文件访问\n' +
+    '- 文件管理：删除和分类管理\n\n' +
+
+    '### AI辅助 (/ai)\n' +
+    '- 简历智能分析：自动评分和技能提取\n' +
+    '- 面试题生成：个性化面试题库\n' +
+    '- 技能匹配分析\n\n' +
+
+    '### 面试管理 (/interviews)\n' +
+    '- 面试安排：设置面试时间和面试官\n' +
+    '- 面试评估：记录面试反馈和评分\n' +
+    '- 面试结果管理\n\n' +
+
     '### 系统监控 (/health)\n' +
     '- 数据库连接状态检查\n' +
     '- 系统健康状态监控\n\n' +
@@ -51,6 +76,11 @@ export const swaggerConfig = new DocumentBuilder()
   .addTag('roles', '角色管理相关接口')
   .addTag('permissions', '权限管理相关接口')
   .addTag('health', '系统健康检查')
+  .addTag('recruitment', '招新管理相关接口')
+  .addTag('applications', '申请管理相关接口')
+  .addTag('files', '文件管理相关接口')
+  .addTag('ai', 'AI辅助功能相关接口')
+  .addTag('interviews', '面试管理相关接口')
   .setContact('开发团队', 'https://github.com/recruitment-system', 'dev@recruitment.com')
   .setLicense('MIT License', 'https://opensource.org/licenses/MIT')
   .build();

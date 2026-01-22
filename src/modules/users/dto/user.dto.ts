@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, MaxLength, IsUrl } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MaxLength, IsUrl, IsObject } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateBasicInfoDto {
@@ -37,6 +37,7 @@ export class UpdateProfileFieldsDto {
       motivation: '我加入的动机是...',
     }
   })
+  @IsObject({ message: 'profileFields必须是一个对象' })
   profileFields: { [key: string]: string };
 }
 

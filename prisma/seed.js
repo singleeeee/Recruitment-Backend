@@ -4,9 +4,9 @@ const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 const initialRoles = [
-  { name: '系统管理员', code: 'super_admin', description: '拥有所有权限，管理其他管理员和系统配置', isActive: true },
-  { name: '社团管理员', code: 'club_admin', description: '管理社团的候选人、招新批次、通知等', isActive: true },
-  { name: '候选人', code: 'candidate', description: '申请加入社团的用户', isActive: true },
+  { name: '系统管理员', code: 'super_admin', description: '拥有所有权限，管理其他管理员和系统配置' },
+  { name: '社团管理员', code: 'club_admin', description: '管理社团的候选人、招新批次、通知等' },
+  { name: '候选人', code: 'candidate', description: '申请加入社团的用户' },
 ];
 
 const initialPermissions = [
