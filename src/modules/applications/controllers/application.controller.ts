@@ -21,7 +21,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @ApiTags('applications')
 @ApiBearerAuth('JWT-auth')
-@Controller('api/v1/applications')
+@Controller('applications')
 export class ApplicationController {
   constructor(private readonly applicationService: ApplicationService) {}
 

@@ -12,23 +12,24 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { RecruitmentService } from '../services/recruitment.service';
 import { CreateRecruitmentDto } from '../dto/create-recruitment.dto';
 import { UpdateRecruitmentDto } from '../dto/update-recruitment.dto';
 import { UpdateRecruitmentStatusDto } from '../dto/recruitment-status.dto';
 import { RecruitmentQueryDto } from '../dto/recruitment-query.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { Public } from '../../auth/decorators/public.decorator';
 
 @ApiTags('recruitment')
 @ApiBearerAuth('JWT-auth')
-@Controller('api/v1/recruitment')
+@Controller('recruitment')
 export class RecruitmentController {
   constructor(private readonly recruitmentService: RecruitmentService) {}
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '获取招新列表' })
+  @ApiOperation({ summary: '获取招新列表 (需要认证)' })
   @ApiResponse({
     status: 200,
     description: '获取招新列表成功',
@@ -64,9 +65,51 @@ export class RecruitmentController {
     return this.recruitmentService.findAll(query);
   }
 
+  @Get('public')
+  @Public()
+  @ApiOperation({ summary: '公开获取招新列表 (无需认证)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: '页码' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '每页数量' })
+  @ApiQuery({ name: 'clubId', required: false, type: String, description: '社团ID' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: '搜索关键词' })
+  @ApiResponse({
+    status: 200,
+    description: '获取公开招新列表成功',
+    schema: {
+      example: {
+        data: [
+          {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            title: '2024年春季招新',
+            clubId: '123e4567-e89b-12d3-a456-426614174001',
+            description: '我们社团致力于...',
+            startTime: '2024-02-01T00:00:00.000Z',
+            endTime: '2024-03-01T00:00:00.000Z',
+            status: 'published',
+            club: {
+              id: '123e4567-e89b-12d3-a456-426614174001',
+              name: '技术社团',
+              description: '一个专注于技术创新的社团'
+            },
+            applicationCount: 25
+          }
+        ],
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 1,
+          pages: 1
+        }
+      }
+    }
+  })
+  async findAllPublished(@Query() query: RecruitmentQueryDto) {
+    return this.recruitmentService.findAllPublished(query);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '获取招新详情' })
+  @ApiOperation({ summary: '获取招新详情 (需要认证)' })
   @ApiResponse({
     status: 200,
     description: '获取招新详情成功'
@@ -77,6 +120,21 @@ export class RecruitmentController {
   })
   async findOne(@Param('id') id: string) {
     return this.recruitmentService.findOne(id);
+  }
+
+  @Get('public/:id')
+  @Public()
+  @ApiOperation({ summary: '公开获取招新详情 (无需认证)' })
+  @ApiResponse({
+    status: 200,
+    description: '获取公开招新详情成功'
+  })
+  @ApiResponse({
+    status: 404,
+    description: '招新不存在或尚未发布'
+  })
+  async findOnePublished(@Param('id') id: string) {
+    return this.recruitmentService.findOnePublished(id);
   }
 
   @Post()

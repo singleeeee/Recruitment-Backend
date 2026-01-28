@@ -255,4 +255,116 @@ export class RecruitmentService {
       where: { id },
     });
   }
+
+  async findAllPublished(query: RecruitmentQueryDto) {
+    const { status, clubId, search, page = 1, limit = 10 } = query;
+    
+    const where: any = {
+      // 只显示已发布的招新
+      status: RecruitmentStatus.PUBLISHED,
+    };
+    
+    // 允许覆盖状态筛选，但要确保至少是已发布状态
+    if (status) {
+      where.status = status;
+    }
+    
+    if (clubId) {
+      where.clubId = clubId;
+    }
+    
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // 确保招新时间有效：已开始或即将开始
+    where.startTime = {
+      lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 未来7天内开始的也算
+    };
+
+    const [recruitments, total] = await Promise.all([
+      this.prisma.recruitmentBatch.findMany({
+        where,
+        include: {
+          club: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+            },
+          },
+          _count: {
+            select: {
+              applications: true,
+            },
+          },
+        },
+        orderBy: [
+          { startTime: 'asc' }, // 按开始时间升序排列
+          { createdAt: 'desc' }
+        ],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.recruitmentBatch.count({ where }),
+    ]);
+
+    return {
+      data: recruitments.map(recruitment => ({
+        ...recruitment,
+        applicationCount: recruitment._count.applications,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOnePublished(id: string) {
+    const recruitment = await this.prisma.recruitmentBatch.findUnique({
+      where: { 
+        id,
+        status: RecruitmentStatus.PUBLISHED, // 只允许查看已发布的招新
+      },
+      include: {
+        club: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+          },
+        },
+        _count: {
+          select: {
+            applications: true,
+          },
+        },
+      },
+    });
+
+    if (!recruitment) {
+      throw new NotFoundException('招新不存在或尚未发布');
+    }
+
+    // 检查招新时间是否有效
+    const now = new Date();
+    if (recruitment.startTime > now) {
+      // 如果招新还没开始，检查是否在未来7天内
+      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      if (recruitment.startTime > sevenDaysFromNow) {
+        throw new NotFoundException('招新尚未开放');
+      }
+    }
+
+    return {
+      ...recruitment,
+      applicationCount: recruitment._count.applications,
+    };
+  }
 }
