@@ -29,7 +29,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: {
-        role: true, // 包含角色信息 
+        role: {
+          include: {
+            permissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
         profileFields: {
           include: {
             field: true // 包含字段配置信息，以获取 fieldName
@@ -45,9 +53,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // 注意：这里我们将 JWT payload 中的 'role' (其值是 role code 字符串) 直接赋给 user 对象
     // RolesGuard 将检查这个 `user.role` 属性
     // `user.roleId` 是从数据库获取的 Role 表的主键 ID
+    // 为了让RolesGuard能正常工作，需要：
+    // 1. user.role 保持为字符串（用于RolesGuard权限检查）
+    // 2. user.roleCode 也保存为字符串
+    // 3. user.roleData 保存完整的角色对象（包含权限）
     return {
       ...user,
-      role: payload.role, // Role CODE from JWT Payload for RolesGuard
+      role: payload.role, // 保持为字符串用于RolesGuard
+      roleCode: payload.role, // 别名
+      roleData: user.role, // 完整的角色对象包含权限
     };
   }
 }

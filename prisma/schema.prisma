@@ -101,6 +101,8 @@ model RegistrationField {
   fieldOrder       Int      @map("field_order") // 字段排序
   isRequired       Boolean  @default(false) @map("is_required") // 是否必填
   isActive         Boolean  @default(true) @map("is_active") // 是否启用
+  isForRecruitment Boolean  @default(false) @map("is_for_recruitment") // 是否用于招新批次
+  isForRegister    Boolean  @default(true) @map("is_for_register") // 是否用于注册
   options          Json? // 选项配置
   validationRules  Json? @map("validation_rules") // 验证规则
   placeholder      String? // 占位符文本

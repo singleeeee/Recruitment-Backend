@@ -64,6 +64,9 @@ export class ApplicationService {
         status: ApplicationStatus.SUBMITTED,
         resumeText: createApplicationDto.resumeText,
         education: createApplicationDto.formData,
+        skills: createApplicationDto.skills,
+        experiences: createApplicationDto.experiences,
+        attachments: createApplicationDto.attachments,
       },
     });
 
@@ -73,7 +76,7 @@ export class ApplicationService {
   }
 
   async findAll(query: ApplicationQueryDto, userId?: string, userRole?: string) {
-    const { status, recruitmentId, applicantId, page = 1, limit = 10 } = query;
+    const { status, recruitmentId, applicantId, clubId, page = 1, limit = 10 } = query;
     
     const where: any = {};
     
@@ -87,6 +90,12 @@ export class ApplicationService {
     
     if (applicantId) {
       where.applicantId = applicantId;
+    }
+
+    if (clubId) {
+      where.recruitment = {
+        clubId: clubId
+      };
     }
 
     // 如果是普通用户，只能查看自己的申请

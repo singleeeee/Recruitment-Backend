@@ -60,12 +60,19 @@ export class ClubController {
     type: String,
     description: '搜索关键词（社团名称）',
   })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    type: Boolean,
+    description: '是否只显示活跃社团',
+  })
   async getAllClubs(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('search') search?: string,
+    @Query('isActive') isActive?: boolean,
   ) {
-    return this.clubService.findAll({ page, limit, search });
+    return this.clubService.findAll({ page, limit, search, isActive });
   }
 
   @Get(':id')

@@ -32,6 +32,16 @@ export class CreateRegistrationFieldDto {
   @IsOptional()
   isActive?: boolean = true;
 
+  @ApiProperty({ example: false, description: '是否用于招新批次', default: false })
+  @IsBoolean()
+  @IsOptional()
+  isForRecruitment?: boolean = false;
+
+  @ApiProperty({ example: true, description: '是否用于注册', default: true })
+  @IsBoolean()
+  @IsOptional()
+  isForRegister?: boolean = true;
+
   @ApiProperty({ example: '{"options": [{"label": "男", "value": "male"}, {"label": "女", "value": "female"}]}', description: '选项配置 (JSON 字符串)', required: false })
   @IsOptional()
   @IsJSON() // Validate as JSON string

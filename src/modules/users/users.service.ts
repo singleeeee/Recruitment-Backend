@@ -13,7 +13,15 @@ export class UsersService {
     return this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        role: true,
+        role: {
+          include: {
+            permissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        },
         profileFields: {
           include: {
             field: true,

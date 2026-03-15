@@ -51,4 +51,24 @@ export class RegistrationFieldService {
       orderBy: { fieldOrder: 'asc' }, // 按排序字段升序返回
     });
   }
+
+  /**
+   * 获取所有用于注册的启用字段
+   */
+  async findAllForRegister() {
+    return this.prisma.registrationField.findMany({
+      where: { isActive: true, isForRegister: true },
+      orderBy: { fieldOrder: 'asc' },
+    });
+  }
+
+  /**
+   * 获取所有用于招新批次的启用字段
+   */
+  async findAllForRecruitment() {
+    return this.prisma.registrationField.findMany({
+      where: { isActive: true, isForRecruitment: true },
+      orderBy: { fieldOrder: 'asc' },
+    });
+  }
 }

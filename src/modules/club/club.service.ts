@@ -1,7 +1,17 @@
-import { Injectable, ConflictException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClubDto } from './dto/create-club.dto';
-import { UpdateClubDto, UpdateClubAdminsDto, AddClubAdminDto, RemoveClubAdminDto } from './dto/update-club.dto';
+import {
+  UpdateClubDto,
+  UpdateClubAdminsDto,
+  AddClubAdminDto,
+  RemoveClubAdminDto,
+} from './dto/update-club.dto';
 
 @Injectable()
 export class ClubService {
@@ -10,9 +20,19 @@ export class ClubService {
   /**
    * 分页获取社团列表，支持搜索
    */
-  async findAll({ page = 1, limit = 10, search }: { page?: number, limit?: number, search?: string }) {
+  async findAll({
+    page = 1,
+    limit = 10,
+    search,
+    isActive,
+  }: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    isActive?: boolean;
+  }) {
     const skip = (page - 1) * limit;
-    const where = search
+    const where: any = search
       ? {
           name: {
             contains: search,
@@ -20,6 +40,11 @@ export class ClubService {
           },
         }
       : {};
+
+    // Only add isActive filter if it's explicitly provided
+    if (isActive !== undefined) {
+      where.isActive = isActive;
+    }
 
     const [clubs, total] = await Promise.all([
       this.prisma.club.findMany({
@@ -94,7 +119,8 @@ export class ClubService {
   /**
    * 创建新社团
    */
-  async create(createClubDto: CreateClubDto) { // 使用 DTO
+  async create(createClubDto: CreateClubDto) {
+    // 使用 DTO
     // 检查社团名称是否已存在
     const existingClub = await this.prisma.club.findUnique({
       where: { name: createClubDto.name },
@@ -115,9 +141,12 @@ export class ClubService {
         description: createClubDto.description,
         category: createClubDto.category,
         logo: createClubDto.logo,
-        admins: createClubDto.adminIds && createClubDto.adminIds.length > 0 ? {
-          connect: createClubDto.adminIds.map(id => ({ id }))
-        } : undefined,
+        admins:
+          createClubDto.adminIds && createClubDto.adminIds.length > 0
+            ? {
+                connect: createClubDto.adminIds.map((id) => ({ id })),
+              }
+            : undefined,
       },
     });
   }
@@ -204,15 +233,22 @@ export class ClubService {
     });
 
     if (conflictUsers.length > 0) {
-      const conflictNames = conflictUsers.map(u => u.name || u.email).join(', ');
-      throw new BadRequestException(`以下管理员已经管理其他社团: ${conflictNames}`);
+      const conflictNames = conflictUsers
+        .map((u) => u.name || u.email)
+        .join(', ');
+      throw new BadRequestException(
+        `以下管理员已经管理其他社团: ${conflictNames}`,
+      );
     }
   }
 
   /**
    * 更新社团管理员
    */
-  async updateClubAdmins(clubId: string, updateClubAdminsDto: UpdateClubAdminsDto) {
+  async updateClubAdmins(
+    clubId: string,
+    updateClubAdminsDto: UpdateClubAdminsDto,
+  ) {
     // 检查社团是否存在
     const existingClub = await this.prisma.club.findUnique({
       where: { id: clubId },
@@ -223,21 +259,27 @@ export class ClubService {
     }
 
     // 验证新的管理员列表
-    if (updateClubAdminsDto.adminIds && updateClubAdminsDto.adminIds.length > 0) {
+    if (
+      updateClubAdminsDto.adminIds &&
+      updateClubAdminsDto.adminIds.length > 0
+    ) {
       await this.validateAndPrepareAdmins(updateClubAdminsDto.adminIds);
     }
 
     // 更新社团的管理员：先断开所有现有连接，然后连接到新的管理员
     const updateData: any = {};
-    
-    if (updateClubAdminsDto.adminIds && updateClubAdminsDto.adminIds.length > 0) {
+
+    if (
+      updateClubAdminsDto.adminIds &&
+      updateClubAdminsDto.adminIds.length > 0
+    ) {
       updateData.admins = {
-        set: updateClubAdminsDto.adminIds.map(id => ({ id }))
+        set: updateClubAdminsDto.adminIds.map((id) => ({ id })),
       };
     } else {
       // 如果没有管理员，清除所有现有管理员
       updateData.admins = {
-        set: []
+        set: [],
       };
     }
 
@@ -245,22 +287,25 @@ export class ClubService {
     const updatedClub = await this.prisma.$transaction(async (prisma) => {
       // 清除原来管理员的clubId
       const currentAdmins = await prisma.user.findMany({
-        where: { clubId: clubId }
+        where: { clubId: clubId },
       });
-      
+
       for (const admin of currentAdmins) {
         await prisma.user.update({
           where: { id: admin.id },
-          data: { clubId: null }
+          data: { clubId: null },
         });
       }
 
       // 设置新管理员的clubId
-      if (updateClubAdminsDto.adminIds && updateClubAdminsDto.adminIds.length > 0) {
+      if (
+        updateClubAdminsDto.adminIds &&
+        updateClubAdminsDto.adminIds.length > 0
+      ) {
         for (const adminId of updateClubAdminsDto.adminIds) {
           await prisma.user.update({
             where: { id: adminId },
-            data: { clubId: clubId }
+            data: { clubId: clubId },
           });
         }
       }
@@ -319,16 +364,16 @@ export class ClubService {
     await this.prisma.$transaction(async (prisma) => {
       await prisma.user.update({
         where: { id: adminId },
-        data: { clubId: clubId }
+        data: { clubId: clubId },
       });
 
       await prisma.club.update({
         where: { id: clubId },
         data: {
           admins: {
-            connect: { id: adminId }
-          }
-        }
+            connect: { id: adminId },
+          },
+        },
       });
     });
 
@@ -338,7 +383,10 @@ export class ClubService {
   /**
    * 移除社团管理员
    */
-  async removeClubAdmin(clubId: string, removeClubAdminDto: RemoveClubAdminDto) {
+  async removeClubAdmin(
+    clubId: string,
+    removeClubAdminDto: RemoveClubAdminDto,
+  ) {
     // 检查社团是否存在
     const existingClub = await this.prisma.club.findUnique({
       where: { id: clubId },
@@ -352,9 +400,9 @@ export class ClubService {
 
     // 检查用户是否是该社团的管理员
     const admin = await this.prisma.user.findUnique({
-      where: { 
+      where: {
         id: adminId,
-        clubId: clubId  // 同时属于该社团
+        clubId: clubId, // 同时属于该社团
       },
     });
 
@@ -367,7 +415,7 @@ export class ClubService {
       // 清除用户的clubId
       await prisma.user.update({
         where: { id: adminId },
-        data: { clubId: null }
+        data: { clubId: null },
       });
 
       // 从社团的admins中移除
@@ -375,9 +423,9 @@ export class ClubService {
         where: { id: clubId },
         data: {
           admins: {
-            disconnect: { id: adminId }
-          }
-        }
+            disconnect: { id: adminId },
+          },
+        },
       });
     });
 

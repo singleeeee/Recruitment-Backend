@@ -64,4 +64,16 @@ export class RegistrationFieldController {
   findAllActive() {
     return this.registrationFieldService.findAllActive();
   }
+
+  @Get('register') // /api/v1/registration-fields/register
+  @ApiOperation({ summary: '获取所有用于注册的启用字段 (用于前端渲染注册表单)' })
+  findAllForRegister() {
+    return this.registrationFieldService.findAllForRegister();
+  }
+
+  @Get('recruitment') // /api/v1/registration-fields/recruitment
+  @ApiOperation({ summary: '获取所有用于招新批次的启用字段 (用于前端渲染招新表单)' })
+  findAllForRecruitment() {
+    return this.registrationFieldService.findAllForRecruitment();
+  }
 }

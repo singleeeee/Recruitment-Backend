@@ -33,6 +33,15 @@ export class ApplicationQueryDto {
   applicantId?: string;
 
   @ApiProperty({ 
+    example: '123e4567-e89b-12d3-a456-426614174002',
+    description: '按社团ID筛选',
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  clubId?: string;
+
+  @ApiProperty({ 
     example: 1,
     description: '页码',
     required: false 
