@@ -15,7 +15,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { UpdateBasicInfoDto, UpdateProfileFieldsDto } from './dto/user.dto';
+import { UpdateBasicInfoDto, UpdateProfileFieldsDto, ProfileFieldValue } from './dto/user.dto';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT-auth')

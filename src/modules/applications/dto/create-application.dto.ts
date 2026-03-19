@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional, IsObject, IsUUID, IsArray } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsObject, IsUUID, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateApplicationDto {
@@ -78,6 +79,15 @@ export class CreateApplicationDto {
   @IsArray()
   attachments?: any[];
 
-  // 文件上传将在单独的API中处理
-  // fileIds field removed as it requires schema changes
+  @ApiProperty({
+    example: [
+      { fileId: 'uuid-of-file', fileType: 'resume', description: '个人简历 PDF' },
+      { fileId: 'uuid-of-file-2', fileType: 'portfolio', description: '作品集' },
+    ],
+    description: '关联的已上传文件列表（先调用 POST /files/upload 获取 fileId，再填入此处）',
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  fileLinks?: { fileId: string; fileType?: string; description?: string }[];
 }

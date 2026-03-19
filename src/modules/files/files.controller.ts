@@ -118,11 +118,12 @@ export class FilesController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiParam({ name: 'id', description: '文件ID' })
   @ApiProduces('application/octet-stream')
   async downloadFile(
     @Param('id', ParseUUIDPipe) fileId: string,
-    @CurrentUser('sub') userId: string,
+    @Req() request: any,
     @Res({ passthrough: true }) response: Response,
     @Headers('range') range?: string,
   ): Promise<StreamableFile> {
@@ -132,8 +133,12 @@ export class FilesController {
       throw new BadRequestException('文件不存在');
     }
 
-    // 检查权限（确保用户只能访问自己上传的文件）
-    if (file.uploadedBy !== userId) {
+    const userId = request.user?.id;
+    const userRole = request.user?.role?.code || request.user?.role;
+
+    // 管理员可以访问所有文件；普通用户只能访问自己上传的
+    const isAdmin = userRole === 'super_admin' || userRole === 'club_admin';
+    if (!isAdmin && file.uploadedBy !== userId) {
       throw new BadRequestException('无权访问此文件');
     }
 

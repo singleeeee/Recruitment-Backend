@@ -208,7 +208,8 @@ model Application {
   applicantId String @map("applicant_id")
   applicant   User   @relation("ApplicantApplications", fields: [applicantId], references: [id])
 
-  interviews Interview[]
+  interviews   Interview[]
+  files        ApplicationFile[] // 关联的上传文件
 
   @@map("applications")
 }
@@ -266,8 +267,25 @@ model File {
 
   user          User     @relation("UserFiles", fields: [uploadedBy], references: [id])
   profileFields UserProfileField[]
+  applications  ApplicationFile[] // 被引用的申请
 
   @@map("files")
+}
+
+// 申请 <-> 文件 多对多中间表
+model ApplicationFile {
+  id            String      @id @default(uuid())
+  applicationId String      @map("application_id")
+  fileId        String      @map("file_id")
+  fileType      String      @default("resume") @map("file_type") // resume, portfolio, certificate, other
+  description   String?     // 文件备注
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  file          File        @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, fileId])
+  @@map("application_files")
 }
 
 // 通知表

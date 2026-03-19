@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEmail, MaxLength, IsUrl, IsObject } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateBasicInfoDto {
@@ -22,23 +23,31 @@ export class UpdateBasicInfoDto {
   avatar?: string;
 }
 
+/**
+ * 档案字段值类型：
+ * - 普通字段（text/select/textarea 等）传字符串值
+ * - file 类型字段传 { fileId: "uuid" }（先通过 POST /files/upload 获取 fileId）
+ */
+export type ProfileFieldValue = string | { fileId: string };
+
 export class UpdateProfileFieldsDto {
   @ApiProperty({
-    type: 'object',
-    additionalProperties: { type: 'string' },
-    description: '用户档案字段数据，根据RegistrationField配置动态生成',
+    description: [
+      '用户档案字段数据，根据 RegistrationField 配置动态生成。',
+      '普通字段（text/select/textarea 等）传字符串值；',
+      'file 类型字段传 { fileId: "uuid" }（先通过 POST /files/upload 获取 fileId）。',
+    ].join(' '),
     example: {
       studentId: '2021001001',
       phone: '15706623209',
       college: '计算机学院',
       major: '计算机科学与技术',
       grade: '2021级',
-      experience: '我的相关经验是...',
-      motivation: '我加入的动机是...',
-    }
+      avatar_file: { fileId: 'uuid-of-uploaded-file' },
+    },
   })
   @IsObject({ message: 'profileFields必须是一个对象' })
-  profileFields: { [key: string]: string };
+  profileFields: { [key: string]: ProfileFieldValue };
 }
 
 export class UserProfileFieldDto {
