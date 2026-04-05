@@ -11,8 +11,13 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   // CORS configuration
+  const rawOrigin = configService.get<string>('CORS_ORIGIN') || '*';
+  // 支持多个 origin（逗号分隔），并自动去掉末尾斜杠
+  const allowedOrigins = rawOrigin === '*'
+    ? '*'
+    : rawOrigin.split(',').map((o) => o.trim().replace(/\/$/, ''));
   app.enableCors({
-    origin: configService.get<string>('CORS_ORIGIN') || '*',
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
