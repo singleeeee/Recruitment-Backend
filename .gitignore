@@ -46,8 +46,7 @@ build/
 # 上传文件
 uploads/
 
-# Prisma
-prisma/migrations/
+# Prisma（migrations 需要提交到 git，供生产环境执行迁移）
 
 # 临时文件
 *.tmp

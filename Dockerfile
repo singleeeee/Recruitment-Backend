@@ -32,13 +32,15 @@ COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm ci --omit=dev && DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" npx prisma generate
 
-# 复制构建产物
+# 复制构建产物和启动脚本
 COPY --from=builder /app/dist ./dist
+COPY scripts ./scripts
+RUN chmod +x scripts/start.sh
 
 # 创建上传目录
 RUN mkdir -p uploads
 
 EXPOSE 3001
 
-# 启动：先执行数据库迁移，若数据库为空则执行 seed 初始化，最后启动服务
-CMD ["sh", "-c", "npx prisma migrate deploy && node -e \"const {PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.role.count().then(c=>{if(c===0){console.log('DB empty, running seed...');require('child_process').execSync('node prisma/seed.js',{stdio:'inherit'})}else{console.log('DB already seeded, skipping.')}p.$disconnect()}).catch(e=>{console.error(e);process.exit(1)})\" && node dist/main"]
+# 启动：执行 start.sh（迁移 → seed检查 → 启动服务）
+CMD ["sh", "scripts/start.sh"]
