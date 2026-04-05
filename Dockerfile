@@ -40,5 +40,5 @@ RUN mkdir -p uploads
 
 EXPOSE 3001
 
-# 启动：先执行数据库迁移，再启动服务（此时 DATABASE_URL 由 Railway 注入）
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+# 启动：先执行数据库迁移，若数据库为空则执行 seed 初始化，最后启动服务
+CMD ["sh", "-c", "npx prisma migrate deploy && node -e \"const {PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.role.count().then(c=>{if(c===0){console.log('DB empty, running seed...');require('child_process').execSync('node prisma/seed.js',{stdio:'inherit'})}else{console.log('DB already seeded, skipping.')}p.$disconnect()}).catch(e=>{console.error(e);process.exit(1)})\" && node dist/main"]
