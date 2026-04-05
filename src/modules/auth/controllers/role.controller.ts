@@ -13,8 +13,8 @@ import {
   HttpCode
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { RolesGuard } from '../guards/roles.guard';
-import { Roles } from '../decorators/roles.decorator';
+import { PermissionGuard } from '../guards/permission.guard';
+import { RequirePermission } from '../decorators/require-permission.decorator';
 import { RoleService } from '../services/role.service';
 import { 
   CreateRoleDto, 
@@ -36,8 +36,8 @@ import {
 @ApiTags('角色权限 - Roles')
 @ApiBearerAuth('JWT-auth')
 @Controller('roles')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('super_admin')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('role_read')
 export class RoleController {
   constructor(private readonly roleService: RoleService) {}
 

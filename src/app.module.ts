@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module';
 import { FilesModule } from './modules/files/files.module';
 import { RegistrationFieldModule } from './modules/registration-field/registration-field.module';
 import { ClubModule } from './modules/club/club.module';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ClubModule } from './modules/club/club.module';
     FilesModule,
     RegistrationFieldModule,
     ClubModule,
+    EmailModule,
   ],
   controllers: [],
   providers: [],

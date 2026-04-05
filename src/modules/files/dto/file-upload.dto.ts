@@ -5,12 +5,12 @@ export class FileUploadDto {
   @ApiProperty({ 
     description: '文件分类',
     example: 'resume',
-    enum: ['resume', 'avatar', 'portfolio', 'certificate'],
+    enum: ['resume', 'avatar', 'portfolio', 'certificate', 'logo'],
     required: false 
   })
   @IsOptional()
   @IsString()
-  @IsIn(['resume', 'avatar', 'portfolio', 'certificate'])
+  @IsIn(['resume', 'avatar', 'portfolio', 'certificate', 'logo'])
   category?: string;
 
   @ApiProperty({ 

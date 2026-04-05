@@ -42,7 +42,7 @@ const initialPermissions = [
 const rolePermissionsMap = {
   super_admin: ['user_read', 'user_create', 'user_update', 'user_delete', 'role_read', 'role_create', 'role_update', 'role_delete', 'recruitment_read', 'recruitment_create', 'recruitment_update', 'recruitment_delete', 'application_read', 'application_update', 'application_delete', 'file_read', 'file_upload', 'file_download', 'file_delete', 'systemsetting_read', 'systemsetting_manage', 'registrationfield_read', 'registrationfield_manage', 'club_read', 'club_manage'],
   club_admin: ['recruitment_read', 'recruitment_create', 'recruitment_update', 'recruitment_delete', 'application_read', 'application_update', 'application_delete', 'file_read', 'file_upload', 'file_download', 'file_delete'],
-  candidate: ['file_upload', 'file_download'],
+  candidate: ['file_upload', 'file_download', 'recruitment_read', 'application_read'],
 };
 
 const initialRegistrationFields = [
@@ -152,6 +152,68 @@ const systemSettingsData = [
   { settingKey: 'contact_email', settingValue: 'support@university.edu', settingType: 'string', description: '系统联系邮箱', isPublic: true },
 ];
 
+// ==================== 邮件模板数据 ====================
+
+/**
+ * 支持的模板变量：
+ *   {{姓名}}        - 候选人姓名
+ *   {{社团名}}      - 社团名称
+ *   {{招新标题}}    - 招新批次标题
+ *
+ * 每条模板对应一个申请状态（statusKey），服务层按状态查找对应模板。
+ * statusKey 与 ApplicationStatus 枚举值保持一致。
+ */
+const emailTemplatesData = [
+  {
+    name: '申请审核中通知',
+    statusKey: 'screening',
+    subject: '【{{社团名}}】您的申请正在审核中',
+    description: '候选人申请进入筛选阶段时自动发送',
+    variables: JSON.stringify(['{{姓名}}', '{{社团名}}', '{{招新标题}}']),
+    body: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;"><div style="background:linear-gradient(135deg,#3b82f6,#6366f1);padding:32px 40px 24px;border-radius:12px 12px 0 0;"><div style="font-size:28px;margin-bottom:8px;">🔍</div><h2 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">申请审核中</h2></div><div style="padding:28px 40px 32px;background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;"><p style="margin:0 0 16px;color:#374151;font-size:15px;">亲爱的 <strong>{{姓名}}</strong> 同学，</p><p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">感谢您申请「<strong>{{招新标题}}</strong>」，我们已收到您的申请材料，目前正在进行初步筛选。</p><div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:16px;"><p style="margin:0;color:#1d4ed8;font-size:14px;">📋 请耐心等待，我们将在审核完成后第一时间通知您结果。</p></div><div style="margin-top:24px;padding-top:20px;border-top:1px solid #f3f4f6;color:#9ca3af;font-size:12px;line-height:1.6;"><p style="margin:0;">此邮件由系统自动发送，请勿直接回复。</p><p style="margin:4px 0 0;">— {{社团名}} 招新组</p></div></div></div>`,
+  },
+  {
+    name: '面试安排通知',
+    statusKey: 'interview_scheduled',
+    subject: '【{{社团名}}】面试通知 — 请注意查收',
+    description: '候选人面试已安排时自动发送',
+    variables: JSON.stringify(['{{姓名}}', '{{社团名}}', '{{招新标题}}']),
+    body: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;"><div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:32px 40px 24px;border-radius:12px 12px 0 0;"><div style="font-size:28px;margin-bottom:8px;">📅</div><h2 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">面试已安排</h2></div><div style="padding:28px 40px 32px;background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;"><p style="margin:0 0 16px;color:#374151;font-size:15px;">亲爱的 <strong>{{姓名}}</strong> 同学，</p><p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">您申请「<strong>{{招新标题}}</strong>」的面试已安排，请留意招新负责人的进一步联系，确认具体时间和地点。</p><div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:16px;"><p style="margin:0;color:#92400e;font-size:14px;">⏰ 请提前做好准备，如有特殊情况无法参加，请及时联系我们。</p></div><div style="margin-top:24px;padding-top:20px;border-top:1px solid #f3f4f6;color:#9ca3af;font-size:12px;line-height:1.6;"><p style="margin:0;">此邮件由系统自动发送，请勿直接回复。</p><p style="margin:4px 0 0;">— {{社团名}} 招新组</p></div></div></div>`,
+  },
+  {
+    name: '面试完成通知',
+    statusKey: 'interview_completed',
+    subject: '【{{社团名}}】面试已完成，等待结果通知',
+    description: '候选人面试完成后自动发送，告知等待结果',
+    variables: JSON.stringify(['{{姓名}}', '{{社团名}}', '{{招新标题}}']),
+    body: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;"><div style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);padding:32px 40px 24px;border-radius:12px 12px 0 0;"><div style="font-size:28px;margin-bottom:8px;">🤝</div><h2 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">面试完成</h2></div><div style="padding:28px 40px 32px;background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;"><p style="margin:0 0 16px;color:#374151;font-size:15px;">亲爱的 <strong>{{姓名}}</strong> 同学，</p><p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">感谢您参加「<strong>{{招新标题}}</strong>」的面试！我们正在综合评估所有候选人，结果将尽快通知您。</p><div style="background:#f5f3ff;border-left:4px solid #8b5cf6;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:16px;"><p style="margin:0;color:#4c1d95;font-size:14px;">💬 感谢您对我们社团的关注与支持，无论结果如何，这都是一次宝贵的经历。</p></div><div style="margin-top:24px;padding-top:20px;border-top:1px solid #f3f4f6;color:#9ca3af;font-size:12px;line-height:1.6;"><p style="margin:0;">此邮件由系统自动发送，请勿直接回复。</p><p style="margin:4px 0 0;">— {{社团名}} 招新组</p></div></div></div>`,
+  },
+  {
+    name: '录用通知（Offer）',
+    statusKey: 'offer_sent',
+    subject: '【{{社团名}}】录用通知 — 恭喜您被录取！🎊',
+    description: '向候选人发送 Offer 时自动触发',
+    variables: JSON.stringify(['{{姓名}}', '{{社团名}}', '{{招新标题}}']),
+    body: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;"><div style="background:linear-gradient(135deg,#ec4899,#db2777);padding:32px 40px 24px;border-radius:12px 12px 0 0;"><div style="font-size:28px;margin-bottom:8px;">🎊</div><h2 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">录用通知</h2></div><div style="padding:28px 40px 32px;background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;"><p style="margin:0 0 16px;color:#374151;font-size:15px;">亲爱的 <strong>{{姓名}}</strong> 同学，</p><p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">热烈祝贺！经过严格的筛选与面试，我们非常高兴地通知您：您已被「<strong>{{社团名}}</strong>」正式录取！</p><div style="background:#fdf2f8;border:1px solid #f9a8d4;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center;"><p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#be185d;">🌟 欢迎加入 {{社团名}}！</p><p style="margin:0;color:#9d174d;font-size:14px;">招新活动：{{招新标题}}</p></div><p style="color:#374151;font-size:14px;line-height:1.7;margin:0 0 16px;">请登录系统确认接受录用邀请，我们将尽快与您联系，告知后续入社安排。</p><div style="margin-top:24px;padding-top:20px;border-top:1px solid #f3f4f6;color:#9ca3af;font-size:12px;line-height:1.6;"><p style="margin:0;">此邮件由系统自动发送，请勿直接回复。</p><p style="margin:4px 0 0;">— {{社团名}} 招新组</p></div></div></div>`,
+  },
+  {
+    name: '入社确认通知',
+    statusKey: 'accepted',
+    subject: '【{{社团名}}】入社确认 — 欢迎正式加入！',
+    description: '候选人确认接受 Offer 后自动发送',
+    variables: JSON.stringify(['{{姓名}}', '{{社团名}}', '{{招新标题}}']),
+    body: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;"><div style="background:linear-gradient(135deg,#10b981,#0d9488);padding:32px 40px 24px;border-radius:12px 12px 0 0;"><div style="font-size:28px;margin-bottom:8px;">🏠</div><h2 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">欢迎正式加入</h2></div><div style="padding:28px 40px 32px;background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;"><p style="margin:0 0 16px;color:#374151;font-size:15px;">亲爱的 <strong>{{姓名}}</strong> 同学，</p><p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">您已确认接受录用邀请，正式成为「<strong>{{社团名}}</strong>」的一员！</p><div style="background:#f0fdf4;border-left:4px solid #10b981;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:16px;"><p style="margin:0;color:#065f46;font-size:14px;">🎉 期待与您共同成长，创造精彩！负责人将尽快与您取得联系，告知具体安排。</p></div><div style="margin-top:24px;padding-top:20px;border-top:1px solid #f3f4f6;color:#9ca3af;font-size:12px;line-height:1.6;"><p style="margin:0;">此邮件由系统自动发送，请勿直接回复。</p><p style="margin:4px 0 0;">— {{社团名}} 招新组</p></div></div></div>`,
+  },
+  {
+    name: '申请未通过通知',
+    statusKey: 'rejected',
+    subject: '【{{社团名}}】申请结果通知',
+    description: '候选人申请被拒绝时自动发送',
+    variables: JSON.stringify(['{{姓名}}', '{{社团名}}', '{{招新标题}}']),
+    body: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#ffffff;"><div style="background:linear-gradient(135deg,#6b7280,#4b5563);padding:32px 40px 24px;border-radius:12px 12px 0 0;"><div style="font-size:28px;margin-bottom:8px;">📩</div><h2 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">申请结果通知</h2></div><div style="padding:28px 40px 32px;background:#ffffff;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;"><p style="margin:0 0 16px;color:#374151;font-size:15px;">亲爱的 <strong>{{姓名}}</strong> 同学，</p><p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px;">感谢您申请「<strong>{{招新标题}}</strong>」并付出的时间与努力。经过认真评估，很遗憾地通知您，本次未能通过筛选。</p><div style="background:#f9fafb;border-left:4px solid #9ca3af;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:16px;"><p style="margin:0;color:#4b5563;font-size:14px;">💪 这次未能成功并不代表终点，希望您继续保持热情，期待未来有机会再次相遇。</p></div><div style="margin-top:24px;padding-top:20px;border-top:1px solid #f3f4f6;color:#9ca3af;font-size:12px;line-height:1.6;"><p style="margin:0;">此邮件由系统自动发送，请勿直接回复。</p><p style="margin:4px 0 0;">— {{社团名}} 招新组</p></div></div></div>`,
+  },
+];
+
 // ==================== 主函数 ====================
 
 async function main() {
@@ -159,6 +221,9 @@ async function main() {
 
   // ---------- 清理旧数据 ----------
   console.log('🗑️  清理旧数据...');
+  await prisma.emailRecipient.deleteMany();
+  await prisma.emailLog.deleteMany();
+  await prisma.emailTemplate.deleteMany();
   await prisma.interviewFeedback.deleteMany();
   await prisma.interview.deleteMany();
   await prisma.application.deleteMany();
@@ -242,6 +307,28 @@ async function main() {
     },
   });
   console.log(`   ✓ ${superAdmin.name} <${superAdmin.email}>  密码: Root123!\n`);
+
+  // ---------- 邮件模板 ----------
+  console.log('📧 创建邮件模板...');
+  const createdTemplates = await Promise.all(
+    emailTemplatesData.map((tpl) =>
+      prisma.emailTemplate.create({
+        data: {
+          name: tpl.name,
+          statusKey: tpl.statusKey,
+          subject: tpl.subject,
+          body: tpl.body,
+          description: tpl.description,
+          variables: tpl.variables,
+          createdBy: superAdmin.id,
+        },
+      })
+    )
+  );
+  createdTemplates.forEach((t, i) =>
+    console.log(`   ✓ [${emailTemplatesData[i].statusKey.padEnd(20)}] ${t.name}`)
+  );
+  console.log();
 
   // ---------- 社团 ----------
   console.log('🏫 创建社团...');

@@ -25,22 +25,33 @@ interface AiEvaluationResult {
 @Injectable()
 export class AiEvaluationService {
   private readonly logger = new Logger(AiEvaluationService.name);
-  private readonly openai: OpenAI;
+  private readonly openai: OpenAI | null;
+  /** AI 功能是否可用（未配置 API Key 时为 false，静默跳过） */
+  private readonly aiEnabled: boolean;
 
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
   ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-      baseURL: this.configService.get<string>('OPENAI_BASE_URL'),
-    });
+    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
+    const baseURL = this.configService.get<string>('OPENAI_BASE_URL');
+
+    if (apiKey && baseURL) {
+      this.openai = new OpenAI({ apiKey, baseURL });
+      this.aiEnabled = true;
+      this.logger.log(`AI 评估已启用，baseURL=${baseURL}`);
+    } else {
+      this.openai = null;
+      this.aiEnabled = false;
+      this.logger.warn('未配置 OPENAI_API_KEY 或 OPENAI_BASE_URL，AI 评估功能已禁用');
+    }
   }
 
   /**
    * 异步触发 AI 评估（不阻塞申请创建接口）
    */
   async triggerEvaluation(applicationId: string): Promise<void> {
+    if (!this.aiEnabled) return; // 未配置时静默跳过
     // 异步执行，不 await，不阻塞调用方
     this.runEvaluation(applicationId).catch((err) => {
       this.logger.error(`AI 评估失败 [applicationId=${applicationId}]: ${err.message}`, err.stack);
@@ -192,6 +203,7 @@ export class AiEvaluationService {
    * 图片文字提取（base64 传给视觉模型）
    */
   private async extractTextFromImage(imagePath: string, mimeType: string): Promise<string | null> {
+    if (!this.openai) return null;
     try {
       const imageBuffer = fs.readFileSync(imagePath);
       const base64 = imageBuffer.toString('base64');
@@ -229,6 +241,7 @@ export class AiEvaluationService {
    * 调用 LLM 进行评估
    */
   private async callLLM(resumeContext: string): Promise<AiEvaluationResult> {
+    if (!this.openai) throw new Error('AI 服务未初始化');
     const systemPrompt = `你是一个专业的社团招新评估助手。请根据申请人提交的简历和申请信息，进行客观、公正的综合评估。
 
 评估维度：

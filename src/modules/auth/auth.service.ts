@@ -90,25 +90,27 @@ export class AuthService {
                   },
                 });
               } else {
-                // 如果配置表中没有该字段，可以选择记录警告或抛出错误
-                console.warn(`注册字段配置中未找到 fieldName: ${fieldName}，跳过保存。`);
+                // 配置表中没有该字段，跳过保存
               }
             }
           }
         }
 
-      // 创建响应前，需要重新获取用户及其角色和动态字段
+      // 创建响应前，需要重新获取用户及其角色、权限和动态字段
       const userWithRelations = await this.prisma.user.findUnique({
         where: { id: user.id },
         include: {
-          role: true,
-          profileFields: true, // 获取所有的动态字段
+          role: {
+            include: {
+              permissions: { include: { permission: true } },
+            },
+          },
+          profileFields: true,
         },
       });
 
       return this.createAuthResponse(userWithRelations);
     } catch (error) {
-      console.error('注册失败:', error);
       throw new BadRequestException('注册失败，请稍后重试');
     }
   }
@@ -131,36 +133,37 @@ export class AuthService {
   async validateUser(
     email: string,
     password: string,
-  ): Promise<any | null> { // Return any to match createAuthResponse expectation
-    // ---- 添加调试日志 ----
-    console.log(`[AuthService.validateUser DEBUG] Attempting to find user by email: ${email}`);
-    // ---------------------
+  ): Promise<any | null> {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { // Include role and profileFields for createAuthResponse
-        role: true,
+      include: {
+        role: {
+          include: {
+            permissions: { include: { permission: true } },
+          },
+        },
         profileFields: true,
       },
     });
 
-    // ---- 添加调试日志 ----
     if (!user) {
-      console.log(`[AuthService.validateUser DEBUG] No user found with email: ${email}`);
       return null;
     }
-    console.log(`[AuthService.validateUser DEBUG] User found with email: ${email}. User ID: ${user.id}. Now validating password.`);
-    // ---------------------
 
-    // ---- 添加调试日志 ----
     const isPasswordValid = await PasswordUtils.validatePassword(password, user.passwordHash);
-    console.log(`[AuthService.validateUser DEBUG] Password validation result for email ${email}: ${isPasswordValid}`);
-    // ---------------------
 
-    if (user && isPasswordValid) {
-      return user;
+    if (!isPasswordValid) {
+      return null;
     }
 
-    return null;
+    // 检查账号状态，非 active 状态一律拒绝登录
+    if (user.status !== 'active') {
+      throw new UnauthorizedException(
+        user.status === 'suspended' ? '账号已被封禁，请联系管理员' : '账号未激活或已被禁用',
+      );
+    }
+
+    return user;
   }
 
   /**
@@ -175,13 +178,21 @@ export class AuthService {
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
         include: {
-          role: true,
+          role: {
+            include: {
+              permissions: { include: { permission: true } },
+            },
+          },
           profileFields: true,
         },
       });
 
       if (!user) {
         throw new UnauthorizedException('无效的刷新令牌');
+      }
+
+      if (user.status !== 'active') {
+        throw new UnauthorizedException('账号已被禁用，无法刷新令牌');
       }
 
       return this.createAuthResponse(user);
@@ -193,11 +204,18 @@ export class AuthService {
   /**
    * 创建认证响应
    */
-  private createAuthResponse(user: any): LoginResponseData { // Use any type for now to handle potential includes
+  private createAuthResponse(user: any): LoginResponseData {
+    // 提取权限 code 列表
+    console.log('[DEBUG] role:', user.role?.code, 'permissions raw:', JSON.stringify(user.role?.permissions?.slice(0,2)));
+    const permissionCodes: string[] = (user.role?.permissions ?? []).map(
+      (rp: any) => rp.permission.code,
+    );
+
     const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role?.code || 'unknown', // Use role.code for JWT for compatibility
+      role: user.role?.code || 'unknown',
+      permissions: permissionCodes,   // ← 权限列表写入 JWT
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -221,11 +239,12 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name || '',
-        role: user.role ? { // Provide structured role object
+        role: user.role ? {
           id: user.role.id,
           name: user.role.name,
           code: user.role.code,
         } : null,
+        permissions: permissionCodes,   // ← 权限列表返回给前端
         // Basic user info from User model
         avatar: user.avatar || undefined,
         status: user.status,

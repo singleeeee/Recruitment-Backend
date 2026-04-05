@@ -142,31 +142,31 @@ export class FilesController {
       throw new BadRequestException('无权访问此文件');
     }
 
-    // 设置响应头
-    response.setHeader('Content-Type', file.mimeType);
-    response.setHeader('Content-Length', file.size.toString());
-    response.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(file.originalName)}"`,
-    );
+    const fileBuffer = this.filesService.getFileBuffer(file.storagePath);
 
     // 支持范围请求（断点续传）
     if (range) {
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : Number(file.size) - 1;
+      const end = parts[1] ? parseInt(parts[1], 10) : fileBuffer.length - 1;
       const chunksize = end - start + 1;
 
-      response.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
+      response.setHeader('Content-Range', `bytes ${start}-${end}/${fileBuffer.length}`);
       response.setHeader('Accept-Ranges', 'bytes');
-      response.setHeader('Content-Length', chunksize);
       response.status(206);
 
-      // 这里应该实现范围读取，为了简化，我们返回整个文件
+      return new StreamableFile(fileBuffer.subarray(start, end + 1), {
+        type: file.mimeType,
+        disposition: `attachment; filename="${encodeURIComponent(file.originalName)}"`,
+        length: chunksize,
+      });
     }
 
-    const fileBuffer = this.filesService.getFileBuffer(file.storagePath);
-    return new StreamableFile(fileBuffer);
+    return new StreamableFile(fileBuffer, {
+      type: file.mimeType,
+      disposition: `attachment; filename="${encodeURIComponent(file.originalName)}"`,
+      length: fileBuffer.length,
+    });
   }
 
   @Get(':id/view')
@@ -184,20 +184,19 @@ export class FilesController {
     }
 
     // 只允许预览特定类型的文件
-    const previewableTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+    const previewableTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
     if (!previewableTypes.includes(file.mimeType)) {
       throw new BadRequestException('此文件类型不支持在线预览');
     }
 
-    // 设置响应头用于在线预览
-    response.setHeader('Content-Type', file.mimeType);
-    response.setHeader(
-      'Content-Disposition',
-      `inline; filename="${encodeURIComponent(file.originalName)}"`,
-    );
-
+    // 通过 StreamableFile 的 type/disposition 选项设置响应头
+    // 避免 Express 对 setHeader('Content-Type') 自动追加 "; charset=utf-8"
     const fileBuffer = this.filesService.getFileBuffer(file.storagePath);
-    return new StreamableFile(fileBuffer);
+    return new StreamableFile(fileBuffer, {
+      type: file.mimeType,
+      disposition: `inline; filename="${encodeURIComponent(file.originalName)}"`,
+      length: fileBuffer.length,
+    });
   }
 
   @Delete(':id')

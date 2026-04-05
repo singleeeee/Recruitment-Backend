@@ -18,8 +18,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { RolesGuard } from '../guards/roles.guard';
-import { Roles } from '../decorators/roles.decorator';
+import { PermissionGuard } from '../guards/permission.guard';
+import { RequirePermission } from '../decorators/require-permission.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -42,8 +42,8 @@ import { UsersService } from '../../users/users.service'; // 引入用户服务
 @ApiTags('admin')
 @ApiBearerAuth('JWT-auth')
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('super_admin')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('user_read')
 export class AdminController {
   constructor(
     private readonly prisma: PrismaService,

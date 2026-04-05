@@ -1,9 +1,14 @@
-import { PartialType, OmitType } from '@nestjs/mapped-types';
+import { PartialType } from '@nestjs/mapped-types';
 import { CreateClubDto } from './create-club.dto';
-import { IsArray, IsUUID, IsOptional } from 'class-validator';
+import { IsArray, IsUUID, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class UpdateClubDto extends PartialType(CreateClubDto) {}
+export class UpdateClubDto extends PartialType(CreateClubDto) {
+  @ApiProperty({ example: true, description: '是否活跃', required: false })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
 
 export class UpdateClubAdminsDto {
   @ApiProperty({ 

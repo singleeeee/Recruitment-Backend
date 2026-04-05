@@ -115,6 +115,7 @@ export class LoginResponseData {
       name: string;
       code: string;
     };
+    permissions: string[];       // 权限 code 列表
     studentId?: string;
     college?: string;
     major?: string;
@@ -122,8 +123,8 @@ export class LoginResponseData {
     phone?: string;
     avatar?: string;
     status: string;
-    experience?: string; // 动态字段
-    motivation?: string; // 动态字段
-    profileFields?: { [key: string]: string }; // 所有动态字段
+    experience?: string;
+    motivation?: string;
+    profileFields?: { [key: string]: string };
   };
 }

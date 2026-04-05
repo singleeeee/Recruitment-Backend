@@ -16,8 +16,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -32,8 +32,8 @@ import { UpdateClubDto, UpdateClubAdminsDto, AddClubAdminDto, RemoveClubAdminDto
 @ApiTags('clubs')
 @ApiBearerAuth('JWT-auth')
 @Controller('clubs')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('super_admin')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('club_manage')
 export class ClubController {
   constructor(private readonly clubService: ClubService) {}
 
@@ -161,18 +161,66 @@ export class ClubController {
     summary: '移除社团管理员',
     description: '超级管理员从社团移除指定的管理员',
   })
-  @ApiParam({
-    name: 'id',
-    description: '社团ID',
-  })
-  @ApiParam({
-    name: 'adminId',
-    description: '要移除的管理员ID',
-  })
+  @ApiParam({ name: 'id', description: '社团ID' })
+  @ApiParam({ name: 'adminId', description: '要移除的管理员ID' })
   async removeClubAdmin(
     @Param('id', ParseUUIDPipe) clubId: string,
     @Param('adminId', ParseUUIDPipe) adminId: string,
   ) {
     return this.clubService.removeClubAdmin(clubId, { adminId });
+  }
+
+  // ─── /members 接口（与前端 clubsApi 对齐） ───────────────────────────
+
+  @Get(':id/members')
+  @ApiOperation({ summary: '获取社团成员列表' })
+  @ApiParam({ name: 'id', description: '社团ID' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'role', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  async getClubMembers(
+    @Param('id', ParseUUIDPipe) clubId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('role') role?: string,
+    @Query('search') search?: string,
+  ) {
+    const roleFilter =
+      role === 'admin' || role === 'candidate' ? role : undefined;
+    return this.clubService.getMembers(clubId, { page, limit, role: roleFilter, search });
+  }
+
+  @Post(':id/members')
+  @ApiOperation({ summary: '添加成员到社团' })
+  @ApiParam({ name: 'id', description: '社团ID' })
+  async addClubMember(
+    @Param('id', ParseUUIDPipe) clubId: string,
+    @Body() body: { userId: string; role: 'admin' | 'candidate' },
+  ) {
+    return this.clubService.addMember(clubId, body);
+  }
+
+  @Put(':id/members/:memberId')
+  @ApiOperation({ summary: '更新成员角色' })
+  @ApiParam({ name: 'id', description: '社团ID' })
+  @ApiParam({ name: 'memberId', description: '成员ID' })
+  async updateClubMemberRole(
+    @Param('id', ParseUUIDPipe) clubId: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
+    @Body() body: { role: 'admin' | 'candidate' },
+  ) {
+    return this.clubService.updateMemberRole(clubId, memberId, body);
+  }
+
+  @Delete(':id/members/:memberId')
+  @ApiOperation({ summary: '从社团移除成员' })
+  @ApiParam({ name: 'id', description: '社团ID' })
+  @ApiParam({ name: 'memberId', description: '成员ID' })
+  async removeClubMember(
+    @Param('id', ParseUUIDPipe) clubId: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
+  ) {
+    return this.clubService.removeMember(clubId, memberId);
   }
 }

@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  StreamableFile,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -26,13 +27,19 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
     const statusCode = response.statusCode;
     
     return next.handle().pipe(
-      map((data) => ({
-        code: statusCode,
-        message: this.getMessage(statusCode),
-        data,
-        success: statusCode < 400, // 2xx 和 3xx 为成功
-        timestamp: new Date().toISOString(),
-      })),
+      map((data) => {
+        // StreamableFile 需要直接透传，不能被 JSON 包装
+        if (data instanceof StreamableFile) {
+          return data as any;
+        }
+        return {
+          code: statusCode,
+          message: this.getMessage(statusCode),
+          data,
+          success: statusCode < 400,
+          timestamp: new Date().toISOString(),
+        };
+      }),
     );
   }
 

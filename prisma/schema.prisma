@@ -88,6 +88,8 @@ model User {
   interviewFeedbacks InterviewFeedback[]
   profileFields  UserProfileField[]
   uploadFiles    File[]   @relation("UserFiles")
+  emailTemplates EmailTemplate[]    @relation("EmailTemplateCreator")
+  emailLogs      EmailLog[]         @relation("EmailLogSender")
 
   @@map("users")
 }
@@ -299,4 +301,63 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("notifications")
+}
+
+// 邮件模板表
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  name        String   // 模板名称，如"录取通知"
+  statusKey   String?  @unique @map("status_key") // 对应申请状态，如 screening/offer_sent，用于自动触发查找
+  subject     String   // 邮件主题
+  body        String   // 邮件正文（HTML）
+  description String?  // 模板说明
+  variables   Json?    // 支持的变量列表，如 ["{{姓名}}", "{{社团名}}"]
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  creator     User     @relation("EmailTemplateCreator", fields: [createdBy], references: [id])
+  logs        EmailLog[]
+
+  @@map("email_templates")
+}
+
+// 邮件发送记录表
+model EmailLog {
+  id           String   @id @default(uuid())
+  subject      String
+  body         String   // 实际发送的 HTML 内容
+  senderEmail  String   @map("sender_email")  // 发件人邮箱
+  senderName   String   @map("sender_name")   // 发件人名称
+  recipientCount Int    @map("recipient_count") // 收件人总数
+  successCount Int      @default(0) @map("success_count")
+  failCount    Int      @default(0) @map("fail_count")
+  status       String   @default("pending") // pending, sending, done, failed
+  filterType   String   @map("filter_type")  // all, specific, by_status, by_recruitment, by_club
+  filterParams Json?    @map("filter_params") // 筛选条件快照
+  sentBy       String   @map("sent_by")
+  templateId   String?  @map("template_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sender       User          @relation("EmailLogSender", fields: [sentBy], references: [id])
+  template     EmailTemplate? @relation(fields: [templateId], references: [id])
+  recipients   EmailRecipient[]
+
+  @@map("email_logs")
+}
+
+// 邮件收件人明细表
+model EmailRecipient {
+  id         String   @id @default(uuid())
+  logId      String   @map("log_id")
+  email      String
+  name       String?
+  status     String   @default("pending") // pending, sent, failed
+  error      String?  // 失败原因
+  sentAt     DateTime? @map("sent_at")
+
+  log        EmailLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@map("email_recipients")
 }

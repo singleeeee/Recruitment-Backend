@@ -218,7 +218,7 @@ export class RoleService {
     }
 
     // 系统默认角色不允许删除
-    if (['system_admin', 'club_admin', 'candidate'].includes(existingRole.code)) {
+    if (['super_admin', 'club_admin', 'candidate'].includes(existingRole.code)) {
       throw new ForbiddenException('系统默认角色不允许删除');
     }
 

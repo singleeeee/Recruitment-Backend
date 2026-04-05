@@ -70,8 +70,6 @@ export class UsersController {
     description: '未授权访问',
   })
   getProfile(@CurrentUser() user: any) {
-    console.log('=== 用户控制器接收到数据 ===');
-    console.log('user对象完整结构:', JSON.stringify(user, null, 2));
     // 聚合动态档案字段
     const profileFieldMap: { [key: string]: string } = {};
     if (user.profileFields) {
@@ -80,45 +78,25 @@ export class UsersController {
       });
     }
 
-    // 提取角色权限信息
-    const permissions = [];
-    console.log('roleData对象:', user.roleData);
-    console.log('roleCode:', user.roleCode);
-    if (user.roleData && user.roleData.permissions) {
-      console.log('发现权限数据');
-      permissions.push(...user.roleData.permissions.map((rp: any) => rp.permission));
-    } else {
-      console.log('没有找到权限数据，roleData对象结构:', JSON.stringify(user.roleData));
-    }
-
-      // 构建返回的用户信息，将常用字段提取到顶层
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        status: user.status,
-        avatar: user.avatar,
-        role: user.roleCode || user.role?.code,
-        // 加入权限信息
-        permissions: permissions.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          code: p.code,
-          module: p.module
-        })),
-        // 常用动态字段提取到顶层，便于前端使用
-        studentId: profileFieldMap['studentId'],
-        college: profileFieldMap['college'],
-        major: profileFieldMap['major'],
-        grade: profileFieldMap['grade'],
-        phone: profileFieldMap['phone'],
-        experience: profileFieldMap['experience'],
-        motivation: profileFieldMap['motivation'],
-        // 完整档案字段映射，便于前端灵活使用
-        profileFields: profileFieldMap,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      status: user.status,
+      avatar: user.avatar,
+      role: user.roleCode || user.role?.code,
+      permissions: user.permissions ?? [],
+      studentId: profileFieldMap['studentId'],
+      college: profileFieldMap['college'],
+      major: profileFieldMap['major'],
+      grade: profileFieldMap['grade'],
+      phone: profileFieldMap['phone'],
+      experience: profileFieldMap['experience'],
+      motivation: profileFieldMap['motivation'],
+      profileFields: profileFieldMap,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 
   @Put('profile/basic')

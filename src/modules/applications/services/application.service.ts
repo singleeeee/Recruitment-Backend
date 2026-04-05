@@ -2,9 +2,10 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException,
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateApplicationDto } from '../dto/create-application.dto';
-import { UpdateApplicationStatusDto, ApplicationStatus } from '../dto/update-application-status.dto';
+import { UpdateApplicationStatusDto, ApplicationStatus, VALID_TRANSITIONS } from '../dto/update-application-status.dto';
 import { ApplicationQueryDto } from '../dto/application-query.dto';
 import { AiEvaluationService } from './ai-evaluation.service';
+import { EmailService } from '../../email/services/email.service';
 
 /** 可在线预览的 MIME 类型 */
 const PREVIEWABLE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'application/pdf']);
@@ -18,6 +19,7 @@ export class ApplicationService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private aiEvaluationService: AiEvaluationService,
+    private emailService: EmailService,
   ) {
     const port = this.configService.get<number>('PORT') || 3001;
     this.baseUrl = `http://localhost:${port}/api/v1`;
@@ -120,7 +122,7 @@ export class ApplicationService {
     return application;
   }
 
-  async findAll(query: ApplicationQueryDto, userId?: string, userRole?: string) {
+  async findAll(query: ApplicationQueryDto, userId?: string, userRole?: string, adminClubId?: string | null) {
     const { status, recruitmentId, applicantId, clubId, page = 1, limit = 10 } = query;
     
     const where: any = {};
@@ -143,9 +145,14 @@ export class ApplicationService {
       };
     }
 
-    // 如果是普通用户，只能查看自己的申请
+    // 候选人只能查看自己的申请
     if (userRole === 'candidate' && userId) {
       where.applicantId = userId;
+    }
+
+    // club_admin 强制限定为自己的社团（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      where.recruitment = { clubId: adminClubId ?? '__no_club__' };
     }
 
     const [applications, total] = await Promise.all([
@@ -234,7 +241,7 @@ export class ApplicationService {
     };
   }
 
-  async findOne(id: string, userId?: string, userRole?: string) {
+  async findOne(id: string, userId?: string, userRole?: string, adminClubId?: string | null) {
     const application = await this.prisma.application.findUnique({
       where: { id },
       include: {
@@ -286,9 +293,15 @@ export class ApplicationService {
       throw new NotFoundException('申请不存在');
     }
 
-    // 权限检查：普通用户只能查看自己的申请
+    // 权限检查：候选人只能查看自己的申请
     if (userRole === 'candidate' && userId && application.applicantId !== userId) {
       throw new ForbiddenException('没有权限查看该申请');
+    }
+
+    // 权限检查：club_admin 只能查看自己社团的申请（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      const recruitmentClubId = (application.recruitment as any)?.club?.id ?? null;
+      this.assertClubAdminOwnership(adminClubId ?? null, recruitmentClubId, id);
     }
 
     // 展开 profileFields
@@ -321,6 +334,7 @@ export class ApplicationService {
     fileLinks: { fileId: string; fileType?: string; description?: string }[],
     userId: string,
     userRole: string,
+    adminClubId: string | null,
   ) {
     const application = await this.prisma.application.findUnique({
       where: { id },
@@ -334,6 +348,15 @@ export class ApplicationService {
     const isAdmin = userRole === 'super_admin' || userRole === 'club_admin';
     if (!isAdmin && application.applicantId !== userId) {
       throw new ForbiddenException('没有权限操作该申请');
+    }
+
+    // club_admin 只能操作自己社团的申请（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      const fullApp = await this.prisma.application.findUnique({
+        where: { id },
+        select: { recruitment: { select: { clubId: true } } },
+      });
+      this.assertClubAdminOwnership(adminClubId, fullApp?.recruitment?.clubId ?? null, id);
     }
 
     // 逐条 upsert，避免重复关联报错
@@ -363,16 +386,12 @@ export class ApplicationService {
     return { files: this.enrichFiles(updatedFiles) };
   }
 
-  async updateStatus(id: string, updateStatusDto: UpdateApplicationStatusDto, userId: string) {
+  async updateStatus(id: string, updateStatusDto: UpdateApplicationStatusDto, userId: string, userRole: string, adminClubId: string | null) {
     const existingApplication = await this.prisma.application.findUnique({
       where: { id },
       include: {
-        applicant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        applicant: { select: { id: true, name: true } },
+        recruitment: { select: { clubId: true } },
       },
     });
 
@@ -380,32 +399,106 @@ export class ApplicationService {
       throw new NotFoundException('申请不存在');
     }
 
-    // 检查权限
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: true,
-      },
-    });
+    const isAdmin = userRole === 'super_admin' || userRole === 'club_admin';
+    const isApplicant = existingApplication.applicantId === userId;
+    const targetStatus = updateStatusDto.status;
+    const currentStatus = existingApplication.status as ApplicationStatus;
 
-    const isAdmin = user.role.code === 'super_admin' || user.role.code === 'club_admin';
-
+    // ── 权限校验 ──────────────────────────────────────────────────
+    // 候选人只能在 offer_sent 时自主 decline
     if (!isAdmin) {
-      throw new ForbiddenException('没有权限修改申请状态');
+      if (
+        isApplicant &&
+        currentStatus === ApplicationStatus.OFFER_SENT &&
+        targetStatus === ApplicationStatus.DECLINED
+      ) {
+        // 允许候选人自主婉拒 offer，跳过管理员校验
+      } else {
+        throw new ForbiddenException('没有权限修改申请状态');
+      }
     }
 
-    // 更新申请状态
+    // club_admin 只能修改自己社团的申请状态
+    if (isAdmin && userRole === 'club_admin') {
+      const recruitmentClubId = (existingApplication.recruitment as any)?.clubId ?? null;
+      this.assertClubAdminOwnership(adminClubId, recruitmentClubId, id);
+    }
+
+    // ── 状态流转合法性校验 ────────────────────────────────────────
+    const allowedTargets = VALID_TRANSITIONS[currentStatus] ?? [];
+    if (!allowedTargets.includes(targetStatus)) {
+      throw new BadRequestException(
+        `不允许从 "${currentStatus}" 流转到 "${targetStatus}"，合法目标状态：[${allowedTargets.join(', ') || '无'}]`,
+      );
+    }
+
+    // ── 更新状态，同时查出申请人和招新信息用于发邮件 ──────────────
     const application = await this.prisma.application.update({
       where: { id },
-      data: {
-        status: updateStatusDto.status,
+      data: { status: targetStatus },
+      include: {
+        applicant: { select: { id: true, name: true, email: true } },
+        recruitment: { select: { title: true, club: { select: { name: true } } } },
       },
     });
+
+    // 异步发送状态通知邮件，不阻塞响应
+    this.sendStatusNotificationEmail(application).catch((err) =>
+      this.logger.warn(`状态通知邮件发送失败 applicationId=${id}: ${err.message}`),
+    );
 
     return application;
   }
 
-  async remove(id: string, userId: string) {
+  /**
+   * 根据申请状态从数据库读取邮件模板，渲染变量后发送通知邮件给候选人。
+   * 若数据库中无对应模板，则静默跳过（不报错）。
+   */
+  private async sendStatusNotificationEmail(application: any) {
+    const { applicant, recruitment, status } = application;
+    if (!applicant?.email) return;
+
+    const senderEmail = process.env.QQ_EMAIL_USER;
+    if (!senderEmail || !process.env.QQ_EMAIL_AUTH_CODE) return;
+
+    // 从数据库按 statusKey 查找模板
+    const template = await this.prisma.emailTemplate.findUnique({
+      where: { statusKey: status },
+    });
+
+    // 无模板 = 该状态不需要发邮件（如 draft / submitted / declined / archived）
+    if (!template) return;
+
+    const clubName = recruitment?.club?.name ?? '社团';
+    const recruitTitle = recruitment?.title ?? '招新活动';
+    const displayName = applicant.name ?? '同学';
+
+    // 渲染模板变量：将 {{姓名}} / {{社团名}} / {{招新标题}} 替换为实际值
+    const renderTemplate = (tpl: string) =>
+      tpl
+        .replace(/\{\{姓名\}\}/g, displayName)
+        .replace(/\{\{社团名\}\}/g, clubName)
+        .replace(/\{\{招新标题\}\}/g, recruitTitle);
+
+    const subject = renderTemplate(template.subject);
+    const body = renderTemplate(template.body);
+    const senderName = `${clubName}招新组`;
+
+    try {
+      const transporter = (this.emailService as any).transporter;
+      await transporter.sendMail({
+        from: `"${senderName}" <${senderEmail}>`,
+        to: applicant.email,
+        subject,
+        html: body,
+      });
+      this.logger.log(`状态通知邮件已发送 to=${applicant.email} status=${status} template="${template.name}"`);
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  async remove(id: string, userId: string, userRole: string) {
     const existingApplication = await this.prisma.application.findUnique({
       where: { id },
       include: {
@@ -422,16 +515,8 @@ export class ApplicationService {
       throw new NotFoundException('申请不存在');
     }
 
-    // 只有申请人自己或管理员可以删除
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: true,
-      },
-    });
-
-    const isAdmin = user.role.code === 'super_admin' || user.role.code === 'club_admin';
-
+    // 直接使用 req.user.role，无需查库
+    const isAdmin = userRole === 'super_admin' || userRole === 'club_admin';
     const canDelete = isAdmin || existingApplication.applicantId === userId;
 
     if (!canDelete) {
@@ -488,11 +573,12 @@ export class ApplicationService {
    * - club_admin: 只统计自己社团的数据
    * - super_admin: 统计全局数据
    */
-  async getDashboardStats(userId: string, userRole: string) {
-    // 确定过滤范围
-    const clubFilter = await this.buildClubFilter(userId, userRole);
+  async getDashboardStats(userId: string, userRole: string, adminClubId?: string | null) {
+    // 确定过滤范围（直接用 req.user.clubId，无需查库）
+    const clubFilter = this.buildClubFilter(userRole, adminClubId);
+    const isSuperAdmin = userRole === 'super_admin';
 
-    // 申请状态统计
+    // 申请状态统计 + 系统级统计（super_admin 专用）
     const [
       totalApplicants,
       passedCount,
@@ -504,14 +590,17 @@ export class ApplicationService {
       acceptedCount,
       activeRecruitments,
       recentActivities,
+      totalClubs,
+      totalBatches,
+      usersByRole,
     ] = await Promise.all([
       // 总候选人数（非草稿）
       this.prisma.application.count({
         where: { ...clubFilter, status: { not: 'draft' } },
       }),
-      // 已通过（passed + offer_sent + accepted）
+      // 已通过（interview_scheduled + interview_completed + offer_sent + accepted）
       this.prisma.application.count({
-        where: { ...clubFilter, status: { in: ['passed', 'offer_sent', 'accepted'] } },
+        where: { ...clubFilter, status: { in: ['interview_scheduled', 'interview_completed', 'offer_sent', 'accepted'] } },
       }),
       // 待面试（interview_scheduled + interview_completed）
       this.prisma.application.count({
@@ -566,6 +655,35 @@ export class ApplicationService {
           },
         },
       }),
+      // super_admin 专用：活跃社团总数
+      isSuperAdmin
+        ? this.prisma.club.count({ where: { isActive: true } })
+        : Promise.resolve(null),
+      // super_admin 专用：招新批次总数
+      isSuperAdmin
+        ? this.prisma.recruitmentBatch.count()
+        : Promise.resolve(null),
+      // super_admin 专用：按角色分组的活跃用户数
+      isSuperAdmin
+        ? this.prisma.user
+            .groupBy({
+              by: ['roleId'],
+              _count: { id: true },
+              where: { status: 'active' },
+            })
+            .then(async (groups) => {
+              const roles = await this.prisma.role.findMany({
+                where: { id: { in: groups.map((g) => g.roleId) } },
+                select: { id: true, code: true, name: true },
+              });
+              const roleMap = Object.fromEntries(roles.map((r) => [r.id, r]));
+              return groups.map((g) => ({
+                roleCode: roleMap[g.roleId]?.code ?? g.roleId,
+                roleName: roleMap[g.roleId]?.name ?? g.roleId,
+                count: g._count.id,
+              }));
+            })
+        : Promise.resolve(null),
     ]);
 
     // 将申请记录转换为活动流格式
@@ -592,28 +710,27 @@ export class ApplicationService {
         offerSentCount,
         acceptedCount,
         activeRecruitments,
+        // super_admin 专用字段（非 super_admin 时为 null）
+        totalClubs: totalClubs ?? null,
+        totalBatches: totalBatches ?? null,
+        usersByRole: usersByRole ?? null,
       },
       recentActivities: activities,
     };
   }
 
-  /** 根据角色构建社团过滤条件 */
-  private async buildClubFilter(userId: string, userRole: string) {
+  /** 根据角色构建社团过滤条件（同步，直接使用 req.user.clubId，无需查库） */
+  private buildClubFilter(userRole: string, adminClubId?: string | null) {
     if (userRole === 'super_admin') {
       return {}; // 全局数据，不过滤
     }
 
     // club_admin 只看自己社团的申请
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { clubId: true },
-    });
-
-    if (!user?.clubId) {
-      return { recruitment: { clubId: '__no_club__' } }; // 没有关联社团则返回空
+    if (!adminClubId) {
+      return { recruitment: { clubId: '__no_club__' } };
     }
 
-    return { recruitment: { clubId: user.clubId } };
+    return { recruitment: { clubId: adminClubId } };
   }
 
   /** 申请状态映射为活动类型 */
@@ -621,7 +738,6 @@ export class ApplicationService {
     const map: Record<string, string> = {
       submitted: 'application_submitted',
       screening: 'application_screening',
-      passed: 'application_passed',
       rejected: 'application_rejected',
       interview_scheduled: 'interview_scheduled',
       interview_completed: 'interview_completed',
@@ -641,7 +757,6 @@ export class ApplicationService {
     const contentMap: Record<string, string> = {
       submitted: `${name} 提交了「${titleShort}」的申请`,
       screening: `${name} 的申请进入筛选阶段`,
-      passed: `${name} 通过了初步筛选`,
       rejected: `${name} 的申请未能通过`,
       interview_scheduled: `${name} 的面试已安排`,
       interview_completed: `${name} 完成了面试`,
@@ -650,6 +765,32 @@ export class ApplicationService {
       declined: `${name} 婉拒了录用邀请`,
     };
     return contentMap[status] || `${name} 的申请状态已更新`;
+  }
+
+  /**
+   * 校验 club_admin 是否有权操作指定社团的申请
+   * 直接使用 req.user.clubId，无需查库
+   *
+   * @param adminClubId    管理员关联的社团 ID（来自 req.user.clubId）
+   * @param targetClubId   申请所属社团 ID（可能为 null）
+   * @param applicationId  申请 ID（仅用于错误日志）
+   */
+  private assertClubAdminOwnership(
+    adminClubId: string | null,
+    targetClubId: string | null,
+    applicationId: string,
+  ): void {
+    if (!adminClubId) {
+      this.logger.warn(`club_admin 未关联任何社团，拒绝访问申请 ${applicationId}`);
+      throw new ForbiddenException('您尚未关联任何社团，无法操作该申请');
+    }
+
+    if (adminClubId !== targetClubId) {
+      this.logger.warn(
+        `club_admin (clubId=${adminClubId}) 尝试访问其他社团申请 ${applicationId} (clubId=${targetClubId})`,
+      );
+      throw new ForbiddenException('您只能管理自己社团的申请');
+    }
   }
 
   /**

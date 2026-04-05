@@ -431,4 +431,107 @@ export class ClubService {
 
     return { message: '社团管理员移除成功' };
   }
+
+  /**
+   * 获取社团成员列表（即该社团的 club_admin 用户）
+   * 返回结构与前端 ClubMember 接口对齐
+   */
+  async getMembers(
+    clubId: string,
+    {
+      page = 1,
+      limit = 10,
+      role,
+      search,
+    }: {
+      page?: number;
+      limit?: number;
+      role?: 'admin' | 'candidate';
+      search?: string;
+    },
+  ) {
+    const club = await this.prisma.club.findUnique({ where: { id: clubId } });
+    if (!club) throw new BadRequestException('社团不存在');
+
+    const where: any = { clubId };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatar: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    // 将 User 包装成前端期望的 ClubMember 结构
+    const data = users.map((u) => ({
+      id: u.id,           // 用 userId 作为 memberId（无独立成员表）
+      userId: u.id,
+      clubId,
+      role: 'admin' as const,
+      joinedAt: u.createdAt.toISOString(),
+      user: {
+        id: u.id,
+        name: u.name ?? '',
+        email: u.email,
+        avatar: u.avatar ?? undefined,
+      },
+    }));
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * 添加成员到社团（复用 addClubAdmin 逻辑）
+   */
+  async addMember(
+    clubId: string,
+    { userId, role }: { userId: string; role: 'admin' | 'candidate' },
+  ) {
+    return this.addClubAdmin(clubId, { adminId: userId });
+  }
+
+  /**
+   * 更新成员角色（当前模型只有 admin 角色，预留接口）
+   */
+  async updateMemberRole(
+    clubId: string,
+    memberId: string,
+    { role }: { role: 'admin' | 'candidate' },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: memberId, clubId },
+    });
+    if (!user) throw new BadRequestException('该成员不属于此社团');
+    return { message: '角色更新成功' };
+  }
+
+  /**
+   * 从社团移除成员（复用 removeClubAdmin 逻辑）
+   */
+  async removeMember(clubId: string, memberId: string) {
+    return this.removeClubAdmin(clubId, { adminId: memberId });
+  }
 }

@@ -16,6 +16,8 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { PermissionGuard } from './guards/permission.guard';
+import { SelfGuard } from './guards/self.guard';
 
 @Module({
   imports: [
@@ -34,7 +36,7 @@ import { RolesGuard } from './guards/roles.guard';
     }),
   ],
   controllers: [AuthController, AdminController, RoleController, PermissionController],
-  providers: [AuthService, RoleService, PermissionService, UsersService, LocalStrategy, JwtStrategy, JwtAuthGuard, RolesGuard],
-  exports: [AuthService, RoleService, PermissionService, JwtAuthGuard, RolesGuard],
+  providers: [AuthService, RoleService, PermissionService, UsersService, LocalStrategy, JwtStrategy, JwtAuthGuard, RolesGuard, PermissionGuard, SelfGuard],
+  exports: [AuthService, RoleService, PermissionService, JwtAuthGuard, RolesGuard, PermissionGuard, SelfGuard],
 })
 export class AuthModule {}

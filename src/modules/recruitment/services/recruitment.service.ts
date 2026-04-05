@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateRecruitmentDto } from '../dto/create-recruitment.dto';
 import { UpdateRecruitmentDto } from '../dto/update-recruitment.dto';
@@ -7,26 +7,24 @@ import { RecruitmentQueryDto } from '../dto/recruitment-query.dto';
 
 @Injectable()
 export class RecruitmentService {
+  private readonly logger = new Logger(RecruitmentService.name);
+
   constructor(private prisma: PrismaService) {}
 
-  async create(createRecruitmentDto: CreateRecruitmentDto, userId: string) {
+  async create(createRecruitmentDto: CreateRecruitmentDto, userId: string, userRole: string, adminClubId: string | null) {
     // 验证时间
     if (createRecruitmentDto.startTime >= createRecruitmentDto.endTime) {
       throw new BadRequestException('结束时间必须晚于开始时间');
     }
 
-    // 检查用户是否有权限为该社团创建招新
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: true,
-      },
-    });
-
-    const isAdmin = user.role.code === 'super_admin' || user.role.code === 'club_admin';
-
+    const isAdmin = userRole === 'super_admin' || userRole === 'club_admin';
     if (!isAdmin) {
       throw new ForbiddenException('没有权限创建招新');
+    }
+
+    // club_admin 只能为自己的社团创建招新（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      this.assertClubAdminOwnership(adminClubId, createRecruitmentDto.clubId, null);
     }
 
     const recruitment = await this.prisma.recruitmentBatch.create({
@@ -47,24 +45,29 @@ export class RecruitmentService {
     return recruitment;
   }
 
-  async findAll(query: RecruitmentQueryDto) {
+  async findAll(query: RecruitmentQueryDto, userId?: string, userRole?: string, adminClubId?: string | null) {
     const { status, clubId, search, page = 1, limit = 10 } = query;
-    
+
     const where: any = {};
-    
+
     if (status) {
       where.status = status;
     }
-    
+
     if (clubId) {
       where.clubId = clubId;
     }
-    
+
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
+    }
+
+    // club_admin 强制限定为自己的社团（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      where.clubId = adminClubId ?? '__no_club__';
     }
 
     const [recruitments, total] = await Promise.all([
@@ -84,9 +87,7 @@ export class RecruitmentService {
             },
           },
         },
-        orderBy: [
-          { createdAt: 'desc' }
-        ],
+        orderBy: [{ createdAt: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -94,7 +95,7 @@ export class RecruitmentService {
     ]);
 
     return {
-      data: recruitments.map(recruitment => ({
+      data: recruitments.map((recruitment) => ({
         ...recruitment,
         applicationCount: recruitment._count.applications,
       })),
@@ -107,7 +108,7 @@ export class RecruitmentService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string, userRole?: string, adminClubId?: string | null) {
     const recruitment = await this.prisma.recruitmentBatch.findUnique({
       where: { id },
       include: {
@@ -144,13 +145,18 @@ export class RecruitmentService {
       throw new NotFoundException('招新不存在');
     }
 
+    // club_admin 只能查看自己社团的招新详情（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      this.assertClubAdminOwnership(adminClubId, recruitment.clubId, id);
+    }
+
     return {
       ...recruitment,
       applicationCount: recruitment._count.applications,
     };
   }
 
-  async update(id: string, updateRecruitmentDto: UpdateRecruitmentDto, userId: string) {
+  async update(id: string, updateRecruitmentDto: UpdateRecruitmentDto, userId: string, userRole: string, adminClubId: string | null) {
     const existingRecruitment = await this.prisma.recruitmentBatch.findUnique({
       where: { id },
     });
@@ -159,24 +165,20 @@ export class RecruitmentService {
       throw new NotFoundException('招新不存在');
     }
 
-    // 检查权限
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: true,
-      },
-    });
-
-    const isAdmin = user.role.code === 'super_admin' || user.role.code === 'club_admin';
-
+    const isAdmin = userRole === 'super_admin' || userRole === 'club_admin';
     if (!isAdmin) {
       throw new ForbiddenException('没有权限修改招新');
+    }
+
+    // club_admin 只能修改自己社团的招新（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      this.assertClubAdminOwnership(adminClubId, existingRecruitment.clubId, id);
     }
 
     // 验证时间
     const startTime = updateRecruitmentDto.startTime || existingRecruitment.startTime;
     const endTime = updateRecruitmentDto.endTime || existingRecruitment.endTime;
-    
+
     if (startTime >= endTime) {
       throw new BadRequestException('结束时间必须晚于开始时间');
     }
@@ -189,7 +191,7 @@ export class RecruitmentService {
     });
   }
 
-  async updateStatus(id: string, updateStatusDto: UpdateRecruitmentStatusDto, userId: string) {
+  async updateStatus(id: string, updateStatusDto: UpdateRecruitmentStatusDto, userId: string, userRole: string, adminClubId: string | null) {
     const existingRecruitment = await this.prisma.recruitmentBatch.findUnique({
       where: { id },
     });
@@ -198,18 +200,14 @@ export class RecruitmentService {
       throw new NotFoundException('招新不存在');
     }
 
-    // 检查权限
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: true,
-      },
-    });
-
-    const isAdmin = user.role.code === 'super_admin' || user.role.code === 'club_admin';
-
+    const isAdmin = userRole === 'super_admin' || userRole === 'club_admin';
     if (!isAdmin) {
       throw new ForbiddenException('没有权限修改招新状态');
+    }
+
+    // club_admin 只能修改自己社团的招新状态（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      this.assertClubAdminOwnership(adminClubId, existingRecruitment.clubId, id);
     }
 
     return await this.prisma.recruitmentBatch.update({
@@ -220,7 +218,7 @@ export class RecruitmentService {
     });
   }
 
-  async remove(id: string, userId: string) {
+  async remove(id: string, userId: string, userRole: string, adminClubId: string | null) {
     const existingRecruitment = await this.prisma.recruitmentBatch.findUnique({
       where: { id },
       include: {
@@ -232,18 +230,14 @@ export class RecruitmentService {
       throw new NotFoundException('招新不存在');
     }
 
-    // 检查权限
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: true,
-      },
-    });
-
-    const isAdmin = user.role.code === 'super_admin' || user.role.code === 'club_admin';
-
+    const isAdmin = userRole === 'super_admin' || userRole === 'club_admin';
     if (!isAdmin) {
       throw new ForbiddenException('没有权限删除招新');
+    }
+
+    // club_admin 只能删除自己社团的招新（直接用 req.user.clubId，无需查库）
+    if (userRole === 'club_admin') {
+      this.assertClubAdminOwnership(adminClubId, existingRecruitment.clubId, id);
     }
 
     // 如果有申请，不能删除
@@ -258,21 +252,19 @@ export class RecruitmentService {
 
   async findAllPublished(query: RecruitmentQueryDto) {
     const { status, clubId, search, page = 1, limit = 10 } = query;
-    
+
     const where: any = {
-      // 只显示已发布的招新
       status: RecruitmentStatus.PUBLISHED,
     };
-    
-    // 允许覆盖状态筛选，但要确保至少是已发布状态
+
     if (status) {
       where.status = status;
     }
-    
+
     if (clubId) {
       where.clubId = clubId;
     }
-    
+
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -280,9 +272,8 @@ export class RecruitmentService {
       ];
     }
 
-    // 确保招新时间有效：已开始或即将开始
     where.startTime = {
-      lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 未来7天内开始的也算
+      lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     };
 
     const [recruitments, total] = await Promise.all([
@@ -303,8 +294,8 @@ export class RecruitmentService {
           },
         },
         orderBy: [
-          { startTime: 'asc' }, // 按开始时间升序排列
-          { createdAt: 'desc' }
+          { startTime: 'asc' },
+          { createdAt: 'desc' },
         ],
         skip: (page - 1) * limit,
         take: limit,
@@ -313,7 +304,7 @@ export class RecruitmentService {
     ]);
 
     return {
-      data: recruitments.map(recruitment => ({
+      data: recruitments.map((recruitment) => ({
         ...recruitment,
         applicationCount: recruitment._count.applications,
       })),
@@ -328,9 +319,9 @@ export class RecruitmentService {
 
   async findOnePublished(id: string) {
     const recruitment = await this.prisma.recruitmentBatch.findUnique({
-      where: { 
+      where: {
         id,
-        status: RecruitmentStatus.PUBLISHED, // 只允许查看已发布的招新
+        status: RecruitmentStatus.PUBLISHED,
       },
       include: {
         club: {
@@ -352,10 +343,8 @@ export class RecruitmentService {
       throw new NotFoundException('招新不存在或尚未发布');
     }
 
-    // 检查招新时间是否有效
     const now = new Date();
     if (recruitment.startTime > now) {
-      // 如果招新还没开始，检查是否在未来7天内
       const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       if (recruitment.startTime > sevenDaysFromNow) {
         throw new NotFoundException('招新尚未开放');
@@ -366,5 +355,33 @@ export class RecruitmentService {
       ...recruitment,
       applicationCount: recruitment._count.applications,
     };
+  }
+
+  /**
+   * 校验 club_admin 是否有权操作指定社团的招新
+   * 直接使用 req.user.clubId，无需查库
+   *
+   * @param adminClubId   管理员关联的社团 ID（来自 req.user.clubId）
+   * @param targetClubId  招新所属社团 ID
+   * @param recruitmentId 招新 ID（仅用于错误日志，create 时传 null）
+   */
+  private assertClubAdminOwnership(
+    adminClubId: string | null,
+    targetClubId: string,
+    recruitmentId: string | null,
+  ): void {
+    if (!adminClubId) {
+      this.logger.warn(
+        `club_admin 未关联任何社团，拒绝访问招新 ${recruitmentId ?? '(新建)'}`,
+      );
+      throw new ForbiddenException('您尚未关联任何社团，无法操作该招新');
+    }
+
+    if (adminClubId !== targetClubId) {
+      this.logger.warn(
+        `club_admin (clubId=${adminClubId}) 尝试访问其他社团招新 ${recruitmentId ?? '(新建)'} (clubId=${targetClubId})`,
+      );
+      throw new ForbiddenException('您只能管理自己社团的招新');
+    }
   }
 }
