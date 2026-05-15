@@ -250,12 +250,18 @@ export class AiEvaluationService {
 3. 技能匹配（skills）：技能与招新要求的匹配程度
 4. 表达能力（expression）：简历/申请书的表达是否清晰、有条理
 
+重要要求：
+- strengths 和 weaknesses 必须基于申请人简历中的具体内容，例如具体提到的技能、项目、经历或表述方式
+- 禁止输出"有相关背景"、"动机明确"、"表达清晰"等通用描述，必须结合简历原文给出具体依据
+- 如果简历内容不足，strengths 可以少于3条，weaknesses 可以只写信息不足这一点
+- summary 必须包含申请人的姓名或具体特征，不能是通用描述
+
 请严格按照以下 JSON 格式输出，不要输出任何其他内容：
 {
   "score": <综合评分 0-100 的整数>,
-  "summary": "<一句话总结申请人特点，不超过50字>",
-  "strengths": ["<优势1>", "<优势2>", "<优势3>"],
-  "weaknesses": ["<不足1>", "<不足2>"],
+  "summary": "<一句话总结申请人特点，不超过50字，必须体现该申请人的具体特征>",
+  "strengths": ["<结合简历具体内容的优势1>", "<结合简历具体内容的优势2>"],
+  "weaknesses": ["<结合简历具体内容的不足1>"],
   "recommendation": "<strongly_recommend|recommend|pending|not_recommend 之一>",
   "details": {
     "motivation": <0-100 整数>,
@@ -275,7 +281,7 @@ export class AiEvaluationService {
         },
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.3, // 低温度，保证输出稳定
+      temperature: 0.7, // 适当提高温度，增加输出差异性
       max_tokens: 1000,
     });
 

@@ -41,7 +41,7 @@ const initialPermissions = [
 
 const rolePermissionsMap = {
   super_admin: ['user_read', 'user_create', 'user_update', 'user_delete', 'role_read', 'role_create', 'role_update', 'role_delete', 'recruitment_read', 'recruitment_create', 'recruitment_update', 'recruitment_delete', 'application_read', 'application_update', 'application_delete', 'file_read', 'file_upload', 'file_download', 'file_delete', 'systemsetting_read', 'systemsetting_manage', 'registrationfield_read', 'registrationfield_manage', 'club_read', 'club_manage'],
-  club_admin: ['recruitment_read', 'recruitment_create', 'recruitment_update', 'recruitment_delete', 'application_read', 'application_update', 'application_delete', 'file_read', 'file_upload', 'file_download', 'file_delete'],
+  club_admin: ['recruitment_read', 'recruitment_create', 'recruitment_update', 'recruitment_delete', 'application_read', 'application_update', 'application_delete', 'file_read', 'file_upload', 'file_download', 'file_delete', 'club_read', 'club_manage'],
   candidate: ['file_upload', 'file_download', 'recruitment_read', 'application_read'],
 };
 
@@ -146,7 +146,7 @@ const systemSettingsData = [
   { settingKey: 'system_version', settingValue: '1.0.0', settingType: 'string', description: '系统版本号', isPublic: true },
   { settingKey: 'max_applications_per_user', settingValue: '3', settingType: 'number', description: '每个用户最多可提交的申请数量', isPublic: true },
   { settingKey: 'allow_registration', settingValue: 'true', settingType: 'boolean', description: '是否开放用户注册', isPublic: true },
-  { settingKey: 'email_notification_enabled', settingValue: 'false', settingType: 'boolean', description: '是否开启邮件通知功能', isPublic: false },
+  { settingKey: 'email_notification_enabled', settingValue: 'true', settingType: 'boolean', description: '是否开启邮件通知功能', isPublic: false },
   { settingKey: 'file_max_size_mb', settingValue: '10', settingType: 'number', description: '文件上传最大限制（MB）', isPublic: true },
   { settingKey: 'maintenance_mode', settingValue: 'false', settingType: 'boolean', description: '维护模式开关，开启后普通用户无法登录', isPublic: false },
   { settingKey: 'contact_email', settingValue: 'support@university.edu', settingType: 'string', description: '系统联系邮箱', isPublic: true },

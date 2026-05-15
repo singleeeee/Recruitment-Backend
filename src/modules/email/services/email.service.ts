@@ -290,4 +290,75 @@ export class EmailService {
     await this.prisma.emailTemplate.delete({ where: { id } });
     return { message: '模板已删除' };
   }
+
+  // ─── 状态通知邮件（带日志记录） ─────────────────────────────────────
+
+  /**
+   * 发送单封通知邮件并记录到 email_logs / email_recipients 表。
+   * 供 ApplicationService 在状态变更时调用。
+   */
+  async sendNotificationEmail(params: {
+    to: string;
+    recipientName: string | null;
+    subject: string;
+    html: string;
+    senderName: string;
+    templateId?: string;
+    sentBy: string;
+  }): Promise<void> {
+    const senderEmail = process.env.QQ_EMAIL_USER;
+    if (!senderEmail || !process.env.QQ_EMAIL_AUTH_CODE) {
+      this.logger.warn('邮件服务未配置，跳过发送');
+      return;
+    }
+
+    // 创建发送记录
+    const log = await this.prisma.emailLog.create({
+      data: {
+        subject: params.subject,
+        body: params.html,
+        senderEmail,
+        senderName: params.senderName,
+        recipientCount: 1,
+        status: 'sending',
+        filterType: 'notification',
+        filterParams: { emails: [params.to] },
+        templateId: params.templateId ?? null,
+        sentBy: params.sentBy,
+        recipients: {
+          create: [{ email: params.to, name: params.recipientName, status: 'pending' }],
+        },
+      },
+    });
+
+    try {
+      await this.transporter.sendMail({
+        from: `"${params.senderName}" <${senderEmail}>`,
+        to: params.to,
+        subject: params.subject,
+        html: params.html,
+      });
+
+      await this.prisma.emailRecipient.updateMany({
+        where: { logId: log.id, email: params.to },
+        data: { status: 'sent', sentAt: new Date() },
+      });
+      await this.prisma.emailLog.update({
+        where: { id: log.id },
+        data: { status: 'done', successCount: 1, failCount: 0 },
+      });
+
+      this.logger.log(`通知邮件已发送 to=${params.to} subject="${params.subject}"`);
+    } catch (err) {
+      await this.prisma.emailRecipient.updateMany({
+        where: { logId: log.id, email: params.to },
+        data: { status: 'failed', error: String(err.message).slice(0, 500) },
+      });
+      await this.prisma.emailLog.update({
+        where: { id: log.id },
+        data: { status: 'failed', successCount: 0, failCount: 1 },
+      });
+      throw err;
+    }
+  }
 }

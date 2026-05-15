@@ -114,6 +114,7 @@ export class LoginResponseData {
       id: string;
       name: string;
       code: string;
+      permissions?: string[];
     };
     permissions: string[];       // 权限 code 列表
     studentId?: string;

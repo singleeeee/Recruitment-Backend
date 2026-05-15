@@ -17,6 +17,16 @@ export class UsersService {
   }
 
   /**
+   * 将头像 URL 写入 user.avatar（由 controller 在上传文件后调用）
+   */
+  async updateAvatar(userId: string, avatarUrl: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatar: avatarUrl },
+    });
+  }
+
+  /**
    * 获取用户详细信息
    */
   async getUserById(userId: string) {
@@ -138,34 +148,22 @@ export class UsersService {
    * 获取用户的档案字段配置和当前值
    */
   async getUserProfileFields(userId: string) {
-    const activeFields = await this.prisma.registrationField.findMany({
-      where: { isActive: true },
-      orderBy: { fieldOrder: 'asc' },
-    });
-
+    // 只查询用户实际已填写的档案字段
     const userProfileFields = await this.prisma.userProfileField.findMany({
       where: { 
         userId: userId,
-        field: { isActive: true }
+        field: { isActive: true },
       },
       include: {
         field: true,
       },
+      orderBy: { field: { fieldOrder: 'asc' } },
     });
 
-    // 构建字段映射
-    const userFieldsMap = userProfileFields.reduce((map, userField) => {
-      map[userField.field.fieldName] = {
-        value: userField.fieldValue,
-        fileId: userField.fileId,
-      };
-      return map;
-    }, {});
-
-    // 返回所有活跃字段配置，包含用户当前值
-    return activeFields.map(field => {
-      const userVal = userFieldsMap[field.fieldName];
-      const fileId = userVal?.fileId || null;
+    // 只返回用户有数据的字段
+    return userProfileFields.map(userField => {
+      const field = userField.field;
+      const fileId = userField.fileId || null;
 
       // file 类型字段：附带预览和下载 URL
       let fileInfo: Record<string, any> | null = null;
@@ -187,7 +185,7 @@ export class UsersService {
         helpText: field.helpText,
         options: field.options,
         validationRules: field.validationRules,
-        currentValue: userVal?.value || '',
+        currentValue: userField.fieldValue || '',
         // file 类型字段返回完整的文件信息（含 URL）
         fileId,
         fileInfo,

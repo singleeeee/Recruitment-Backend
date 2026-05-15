@@ -178,7 +178,8 @@ export class ApplicationService {
               email: true,
               avatar: true,
               profileFields: {
-                include: {
+                select: {
+                  fieldValue: true,
                   field: {
                     select: { fieldName: true },
                   },
@@ -265,7 +266,8 @@ export class ApplicationService {
             email: true,
             avatar: true,
             profileFields: {
-              include: {
+              select: {
+                fieldValue: true,
                 field: {
                   select: { fieldName: true },
                 },
@@ -320,6 +322,8 @@ export class ApplicationService {
         college: profileMap['college'] || null,
         major: profileMap['major'] || null,
         grade: profileMap['grade'] || null,
+        experience: profileMap['experience'] || null,
+        motivation: profileMap['motivation'] || null,
       },
       files: this.enrichFiles((application as any).files),
     };
@@ -443,7 +447,7 @@ export class ApplicationService {
     });
 
     // 异步发送状态通知邮件，不阻塞响应
-    this.sendStatusNotificationEmail(application).catch((err) =>
+    this.sendStatusNotificationEmail(application, userId).catch((err) =>
       this.logger.warn(`状态通知邮件发送失败 applicationId=${id}: ${err.message}`),
     );
 
@@ -452,14 +456,21 @@ export class ApplicationService {
 
   /**
    * 根据申请状态从数据库读取邮件模板，渲染变量后发送通知邮件给候选人。
-   * 若数据库中无对应模板，则静默跳过（不报错）。
+   * 若数据库中无对应模板，或系统设置关闭了邮件通知，则静默跳过。
+   * 发送记录会写入 email_logs / email_recipients 表，管理员可在发送历史中查看。
    */
-  private async sendStatusNotificationEmail(application: any) {
+  private async sendStatusNotificationEmail(application: any, triggeredBy: string) {
     const { applicant, recruitment, status } = application;
     if (!applicant?.email) return;
 
-    const senderEmail = process.env.QQ_EMAIL_USER;
-    if (!senderEmail || !process.env.QQ_EMAIL_AUTH_CODE) return;
+    // 检查系统设置：email_notification_enabled
+    const setting = await this.prisma.systemSetting.findUnique({
+      where: { settingKey: 'email_notification_enabled' },
+    });
+    if (setting?.settingValue === 'false') {
+      this.logger.log('邮件通知已关闭（system_settings.email_notification_enabled = false），跳过发送');
+      return;
+    }
 
     // 从数据库按 statusKey 查找模板
     const template = await this.prisma.emailTemplate.findUnique({
@@ -484,18 +495,18 @@ export class ApplicationService {
     const body = renderTemplate(template.body);
     const senderName = `${clubName}招新组`;
 
-    try {
-      const transporter = (this.emailService as any).transporter;
-      await transporter.sendMail({
-        from: `"${senderName}" <${senderEmail}>`,
-        to: applicant.email,
-        subject,
-        html: body,
-      });
-      this.logger.log(`状态通知邮件已发送 to=${applicant.email} status=${status} template="${template.name}"`);
-    } catch (err) {
-      throw err;
-    }
+    // 通过 EmailService 发送并记录到 email_logs
+    await this.emailService.sendNotificationEmail({
+      to: applicant.email,
+      recipientName: displayName,
+      subject,
+      html: body,
+      senderName,
+      templateId: template.id,
+      sentBy: triggeredBy,
+    });
+
+    this.logger.log(`状态通知邮件已发送 to=${applicant.email} status=${status} template="${template.name}"`);
   }
 
   async remove(id: string, userId: string, userRole: string) {

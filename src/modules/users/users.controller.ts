@@ -3,8 +3,14 @@ import {
   Get,
   UseGuards,
   Put,
+  Post,
   Body,
+  UploadedFile,
+  UseInterceptors,
+  Req,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '@prisma/client';
@@ -16,13 +22,25 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UpdateBasicInfoDto, UpdateProfileFieldsDto, ProfileFieldValue } from './dto/user.dto';
+import { memoryStorage } from 'multer';
+import { FilesService } from '../files/files.service';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT-auth')
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  private readonly baseUrl: string;
+
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly filesService: FilesService,
+    private readonly configService: ConfigService,
+  ) {
+    const port = this.configService.get<number>('PORT') || 3001;
+    this.baseUrl = `http://localhost:${port}/api/v1`;
+  }
   @Get('profile')
   @ApiOperation({
     summary: '获取当前用户信息',
@@ -223,5 +241,33 @@ export class UsersController {
   async getProfileFieldsConfig(@CurrentUser() user: any) {
     const fieldConfigs = await this.usersService.getUserProfileFields(user.id);
     return { fields: fieldConfigs };
+  }
+
+  @Post('avatar')
+  @ApiOperation({ summary: '上传用户头像' })
+  @ApiResponse({ status: 200, description: '头像上传成功' })
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(new BadRequestException('只允许上传图片文件'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadAvatar(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+  ): Promise<{ url: string; message: string }> {
+    if (!file) {
+      throw new BadRequestException('请上传头像文件');
+    }
+    const uploadedFile = await this.filesService.uploadFile(file, req.user.id, 'avatar');
+    const avatarUrl = `${this.baseUrl}/files/${uploadedFile.id}/view`;
+    await this.usersService.updateAvatar(req.user.id, avatarUrl);
+    return { url: avatarUrl, message: '头像上传成功' };
   }
 }

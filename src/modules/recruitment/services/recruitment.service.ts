@@ -210,10 +210,20 @@ export class RecruitmentService {
       this.assertClubAdminOwnership(adminClubId, existingRecruitment.clubId, id);
     }
 
+    const now = new Date();
+    const { status: newStatus } = updateStatusDto;
+
+    // 发布或开始招新时，校验截止时间是否已过
+    if (newStatus === RecruitmentStatus.PUBLISHED || newStatus === RecruitmentStatus.ONGOING) {
+      if (existingRecruitment.endTime <= now) {
+        throw new BadRequestException('招新截止时间已过，无法发布或开始招新，请先修改截止时间');
+      }
+    }
+
     return await this.prisma.recruitmentBatch.update({
       where: { id },
       data: {
-        status: updateStatusDto.status,
+        status: newStatus,
       },
     });
   }
@@ -253,12 +263,16 @@ export class RecruitmentService {
   async findAllPublished(query: RecruitmentQueryDto) {
     const { status, clubId, search, page = 1, limit = 10 } = query;
 
-    const where: any = {
-      status: RecruitmentStatus.PUBLISHED,
-    };
+    const where: any = {};
 
     if (status) {
+      // 前端明确指定状态时，按指定状态过滤
       where.status = status;
+    } else {
+      // 默认显示「已发布」和「进行中」的招新
+      where.status = {
+        in: [RecruitmentStatus.PUBLISHED, RecruitmentStatus.ONGOING],
+      };
     }
 
     if (clubId) {
@@ -271,10 +285,6 @@ export class RecruitmentService {
         { description: { contains: search, mode: 'insensitive' } },
       ];
     }
-
-    where.startTime = {
-      lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    };
 
     const [recruitments, total] = await Promise.all([
       this.prisma.recruitmentBatch.findMany({
@@ -318,10 +328,10 @@ export class RecruitmentService {
   }
 
   async findOnePublished(id: string) {
-    const recruitment = await this.prisma.recruitmentBatch.findUnique({
+    const recruitment = await this.prisma.recruitmentBatch.findFirst({
       where: {
         id,
-        status: RecruitmentStatus.PUBLISHED,
+        status: { in: [RecruitmentStatus.PUBLISHED, RecruitmentStatus.ONGOING] },
       },
       include: {
         club: {
@@ -344,11 +354,9 @@ export class RecruitmentService {
     }
 
     const now = new Date();
-    if (recruitment.startTime > now) {
-      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      if (recruitment.startTime > sevenDaysFromNow) {
-        throw new NotFoundException('招新尚未开放');
-      }
+    // 招新已过期，不允许查看
+    if (recruitment.endTime <= now) {
+      throw new NotFoundException('该招新已结束');
     }
 
     return {

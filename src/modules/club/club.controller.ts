@@ -18,6 +18,8 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import {
   ApiTags,
   ApiOperation,
@@ -33,14 +35,14 @@ import { UpdateClubDto, UpdateClubAdminsDto, AddClubAdminDto, RemoveClubAdminDto
 @ApiBearerAuth('JWT-auth')
 @Controller('clubs')
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@RequirePermission('club_manage')
 export class ClubController {
   constructor(private readonly clubService: ClubService) {}
 
   @Get()
+  @RequirePermission('club_read')
   @ApiOperation({
     summary: '获取所有社团列表',
-    description: '超级管理员查看所有社团信息',
+    description: '查看所有社团信息',
   })
   @ApiQuery({
     name: 'page',
@@ -67,18 +69,22 @@ export class ClubController {
     description: '是否只显示活跃社团',
   })
   async getAllClubs(
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('search') search?: string,
     @Query('isActive') isActive?: boolean,
   ) {
-    return this.clubService.findAll({ page, limit, search, isActive });
+    // club_admin 只能看到自己管理的社团
+    const clubId = user.roleCode === 'club_admin' ? user.clubId : undefined;
+    return this.clubService.findAll({ page, limit, search, isActive, clubId });
   }
 
   @Get(':id')
+  @RequirePermission('club_read')
   @ApiOperation({
     summary: '获取社团详情',
-    description: '超级管理员查看指定社团的详细信息',
+    description: '查看指定社团的详细信息',
   })
   @ApiParam({
     name: 'id',
@@ -89,6 +95,7 @@ export class ClubController {
   }
 
   @Post()
+  @RequirePermission('club_manage')
   @ApiOperation({
     summary: '创建社团',
     description: '超级管理员创建新社团',
@@ -100,6 +107,7 @@ export class ClubController {
   }
 
   @Put(':id')
+  @RequirePermission('club_manage')
   @ApiOperation({
     summary: '更新社团信息',
     description: '超级管理员修改社团信息',
@@ -116,6 +124,7 @@ export class ClubController {
   }
 
   @Delete(':id')
+  @RequirePermission('club_manage')
   @ApiOperation({
     summary: '删除社团',
     description: '超级管理员删除社团（软删除，设置isActive为false）',
@@ -125,6 +134,7 @@ export class ClubController {
   }
 
   @Put(':id/admins')
+  @RequirePermission('club_manage')
   @ApiOperation({
     summary: '更新社团管理员',
     description: '超级管理员替换社团的所有管理员',
@@ -141,6 +151,7 @@ export class ClubController {
   }
 
   @Post(':id/admins')
+  @RequirePermission('club_manage')
   @ApiOperation({
     summary: '添加社团管理员',
     description: '超级管理员为社团添加新的管理员',
@@ -157,6 +168,7 @@ export class ClubController {
   }
 
   @Delete(':id/admins/:adminId')
+  @RequirePermission('club_manage')
   @ApiOperation({
     summary: '移除社团管理员',
     description: '超级管理员从社团移除指定的管理员',
@@ -173,6 +185,7 @@ export class ClubController {
   // ─── /members 接口（与前端 clubsApi 对齐） ───────────────────────────
 
   @Get(':id/members')
+  @RequirePermission('club_read')
   @ApiOperation({ summary: '获取社团成员列表' })
   @ApiParam({ name: 'id', description: '社团ID' })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -192,6 +205,7 @@ export class ClubController {
   }
 
   @Post(':id/members')
+  @RequirePermission('club_manage')
   @ApiOperation({ summary: '添加成员到社团' })
   @ApiParam({ name: 'id', description: '社团ID' })
   async addClubMember(
@@ -202,6 +216,7 @@ export class ClubController {
   }
 
   @Put(':id/members/:memberId')
+  @RequirePermission('club_manage')
   @ApiOperation({ summary: '更新成员角色' })
   @ApiParam({ name: 'id', description: '社团ID' })
   @ApiParam({ name: 'memberId', description: '成员ID' })
@@ -214,6 +229,7 @@ export class ClubController {
   }
 
   @Delete(':id/members/:memberId')
+  @RequirePermission('club_manage')
   @ApiOperation({ summary: '从社团移除成员' })
   @ApiParam({ name: 'id', description: '社团ID' })
   @ApiParam({ name: 'memberId', description: '成员ID' })

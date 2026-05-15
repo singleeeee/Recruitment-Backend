@@ -105,7 +105,9 @@ export class AuthService {
               permissions: { include: { permission: true } },
             },
           },
-          profileFields: true,
+          profileFields: {
+            include: { field: true },
+          },
         },
       });
 
@@ -142,7 +144,9 @@ export class AuthService {
             permissions: { include: { permission: true } },
           },
         },
-        profileFields: true,
+        profileFields: {
+          include: { field: true },
+        },
       },
     });
 
@@ -183,7 +187,9 @@ export class AuthService {
               permissions: { include: { permission: true } },
             },
           },
-          profileFields: true,
+          profileFields: {
+            include: { field: true },
+          },
         },
       });
 
@@ -227,8 +233,8 @@ export class AuthService {
     // Extract dynamic profile values from profileFields
     const profileFieldMap: { [key: string]: string } = {};
     if (user.profileFields) {
-        user.profileFields.forEach((field: any) => {
-            profileFieldMap[field.fieldName] = field.fieldValue;
+        user.profileFields.forEach((pf: any) => {
+            profileFieldMap[pf.field.fieldName] = pf.fieldValue;
         });
     }
 
@@ -243,6 +249,7 @@ export class AuthService {
           id: user.role.id,
           name: user.role.name,
           code: user.role.code,
+          permissions: permissionCodes,  // 前端需要此字段在 userProfile 加载前判断权限
         } : null,
         permissions: permissionCodes,   // ← 权限列表返回给前端
         // Basic user info from User model

@@ -25,11 +25,13 @@ export class ClubService {
     limit = 10,
     search,
     isActive,
+    clubId,
   }: {
     page?: number;
     limit?: number;
     search?: string;
     isActive?: boolean;
+    clubId?: string | null;
   }) {
     const skip = (page - 1) * limit;
     const where: any = search
@@ -44,6 +46,11 @@ export class ClubService {
     // Only add isActive filter if it's explicitly provided
     if (isActive !== undefined) {
       where.isActive = isActive;
+    }
+
+    // 如果指定了 clubId，只返回该社团（club_admin 场景）
+    if (clubId) {
+      where.id = clubId;
     }
 
     const [clubs, total] = await Promise.all([
